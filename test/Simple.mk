@@ -1,13 +1,15 @@
 all: test.hex
 
-#ARD_HOME=/cygdrive/c/PROGRA~1/Arduino
-ARD_HOME=/home/uldisa/Arduino/build/linux/work
+ARD_HOME=/cygdrive/c/PROGRA~1/Arduino
+#ARD_HOME=/home/uldisa/Arduino/build/linux/work
 ARD_CMD_HOME=$(ARD_HOME)
 ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
 ARD_CMD_HOME=c:/PROGRA~1/Arduino
 endif
 
 ARDMK_PATH=$(ARD_HOME)/hardware/tools/avr/bin
+CFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
+CXXFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
 
 CC_NAME      = avr-gcc
 CXX_NAME     = avr-g++
@@ -31,97 +33,89 @@ MV      = mv -f
 CAT     = cat
 ECHO    = echo
 MKDIR   = mkdir -p
-
-%.hex: %.o
-	$(OBJCOPY) -O ihex test.o test.hex
+CC_CMD=$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+CXX_CMD=$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
+CC_CMD=$(CC) $(CPPFLAGS) $(CFLAGS) -c `cygpath -m $<` -o $(foreach f,$@,`cygpath -m $(f)`)
+CXX_CMD=$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c `cygpath -m $<` -o $(foreach f,$@,`cygpath -m $(f)`)
+endif
+%.hex: %.elf
+	$(OBJCOPY) -O ihex $< $@ 
 %.elf: %.o 
 	$(CC) $(LDFLAGS) -o $@ $^ -lc -lm
+%.prog: %.hex
+ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
+	$(ARDMK_PATH)/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -U flash:w:$<:i -C $(ARDMK_PATH)/../etc/avrdude.conf
+else
+	$(ARDMK_PATH)/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -U flash:w:$<:i -C `cygpath -m $(ARDMK_PATH)/../etc/avrdude.conf`
+endif
 
 
 OBJDIR=.
 ###### ALL Arduino core libraries
 ARDUINO_CORE_PATH=$(ARD_HOME)/hardware/arduino/avr/cores/arduino
-COREINCL=-I$(ARD_CMD_HOME)/hardware/arduino/avr/cores/arduino -I$(ARD_CMD_HOME)/hardware/arduino/avr/variants/mega
+LIBcoreINCL=-I$(ARDUINO_CORE_PATH) -I$(ARDUINO_CORE_PATH)/../../variants/mega
+ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
+LIBcoreINCL=-I`cygpath -m $(ARDUINO_CORE_PATH)` -I`cygpath -m $(ARDUINO_CORE_PATH)/../../variants/mega`
+endif
 
-CORE_C_SRCS     = $(wildcard $(ARDUINO_CORE_PATH)/*.c)
-CORE_CPP_SRCS   = $(wildcard $(ARDUINO_CORE_PATH)/*.cpp)
+LIBcore_C_SRCS     = $(wildcard $(ARDUINO_CORE_PATH)/*.c)
+LIBcore_CPP_SRCS   = $(wildcard $(ARDUINO_CORE_PATH)/*.cpp)
 
-CORE_OBJ_FILES  = $(CORE_C_SRCS:.c=.o) $(CORE_CPP_SRCS:.cpp=.o)
-CORE_OBJS       = $(addprefix $(OBJDIR)/,$(notdir $(CORE_OBJ_FILES)))
-
-libcore.a:	$(CORE_OBJS)
-		$(AR) rcs $@ $<
-
-$(CORE_OBJS):CFLAGS+=$(COREINCL)
-$(CORE_OBJS):CXXFLAGS+=$(COREINCL)
-
-$(OBJDIR)/%.o: $(ARDUINO_CORE_PATH)/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/%.o: $(ARDUINO_CORE_PATH)/%.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 ###### External libraries
-LIBS=SD SPI
-ARD_LIB_PATH=$(ARD_CMD_HOME)/libraries
+LIBS=SD SPI WiFi
+ARD_LIB_PATH=$(ARD_HOME)/libraries
 
 define get_lib_sources
 LIB$1INCL=-I$2/src -I$2/arch/avr
-OBJDIR$1=$(OBJDIR)/$1
+ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
+LIB$1INCL=-I`cygpath -m $2`/src -I`cygpath -m $2`/arch/avr
+endif
 
 LIB$1_C_SRCS     = $(foreach d,src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.c))
 LIB$1_CPP_SRCS   = $(foreach d,src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.cpp))
 endef
 $(foreach l,$(LIBS),$(eval $(call get_lib_sources,$(l),$(ARD_LIB_PATH)/$(l))))
 
-define ard_lib
-
-LIB$1_OBJ_FILES  = $$(LIB$1_C_SRCS:.c=.o) $$(LIB$1_CPP_SRCS:.cpp=.o)
-LIB$1_OBJS       = $$(addprefix $$(OBJDIR$1)/,$$(notdir $$(LIB$1_OBJ_FILES)))
-
-lib$1.a:	$$(LIB$1_OBJS)
-		$$(AR) rcs $$@ $$^
-
-$$(LIB$1_OBJS):CFLAGS+=$$(COREINCL) $$(LIB$1INCL)
-$$(LIB$1_OBJS):CXXFLAGS+=$$(COREINCL) $$(LIB$1INCL)
-
-#$$(OBJDIR$1)/%.o: $2/src/%.c |$$(OBJDIR$1)/
-#	$$(CC) $$(CPPFLAGS) $$(CFLAGS) -c $$< -o $$@
-#
-#$$(OBJDIR$1)/%.o: $2/arch/avr/%.c |$$(OBJDIR$1)/
-#	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) -c $$< -o $$@
-#
-#$$(OBJDIR$1)/%.o: $2/src/%.cpp  |$$(OBJDIR$1)/
-#	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) -c $$< -o $$@
-#
-#$$(OBJDIR$1)/%.o: $2/arch/avr/%.cpp |$$(OBJDIR$1)/
-#	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) -c $$< -o $$@
+define cpp_compile_rules
+LIB$1_OBJS       += $$(OBJDIR)/$1/$(notdir $(2:.cpp=.o))
+$$(OBJDIR)/$1/$(notdir $(2:.cpp=.o)): $2 |$$(OBJDIR)/$1/
+	$(value CXX_CMD)
 
 endef
+$(foreach l,core $(LIBS),$(foreach c,$(LIB$(l)_CPP_SRCS),$(eval $(call cpp_compile_rules,$(l),$(c)))))
 
-define c_to_o
-$2: $1 |$(dir $2) 
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) -c $$< -o $$@
+define c_compile_rules
+LIB$1_OBJS       += $$(OBJDIR)/$1/$(notdir $(2:.c=.o))
+$$(OBJDIR)/$1/$(notdir $(2:.c=.o)): $2 |$$(OBJDIR)/$1/
+	$(value CC_CMD)
 
 endef
+$(foreach l,core $(LIBS),$(foreach c,$(LIB$(l)_C_SRCS),$(eval $(call c_compile_rules,$(l),$(c)))))
+
+$(addprefix $(OBJDIR)/,$(addsuffix /,core $(LIBS))):
+	mkdir -p $@
+
+define create_lib
+lib$1.a:$$(LIB$1_OBJS)
+	$$(AR) rcs $$@ $$^
+endef
+$(foreach l,core $(LIBS),$(eval $(call create_lib,$(l))))
+
+#$$(LIB$1_OBJS):CFLAGS+=$$(COREINCL) $$(LIB$1INCL)
+#$$(LIB$1_OBJS):CXXFLAGS+=$$(COREINCL) $$(LIB$1INCL)
+
+CFLAGS+=$(foreach l,$(LIBS) core,$(LIB$lINCL))
+CXXFLAGS+=$(foreach l,$(LIBS) core,$(LIB$lINCL))
 
 $(info aaaa $(LIBSD_OBJS))
-$(foreach l,$(LIBS),$(eval $(call ard_lib,$(l),$(ARD_LIB_PATH)/$(l))))
+#$(foreach l,$(LIBS),$(eval $(call ard_lib,$(l),$(ARD_LIB_PATH)/$(l))))
 $(info aaaa $(LIBSD_OBJS))
 ########################
 
-#%.o: %.c
-#	avr-gcc -mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154 test.c -o test.o
 
-CFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
-CXXFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
-test.o: CXXFLAGS+=$(COREINCL) $(LIBSDINCL) $(LIBSPIINCL)
-#%.o: %.cpp
-#	avr-g++ -mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154 test.c -o test.o
-
-test.elf: libcore.a libSD.a
+test.elf: libcore.a libSD.a libSPI.a
 test.elf: LDFLAGS+=-mmcu=atmega2560 -Wl,--gc-sections -lc -lm
-prog: test.hex
-	avrdude -p atmega2560 -c arduino -P \\\.\COM11 -U flash:w:test.hex:i -C D:\Progra~1\arduino-1.0-beta1/hardware/tools/avr/etc/avrdude.conf
 
 print-%:
 	@echo "$($(*))"
