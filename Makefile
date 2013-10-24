@@ -1,15 +1,12 @@
 all: test.hex
 
-ARD_HOME=/cygdrive/c/PROGRA~1/Arduino
-#ARD_HOME=/home/uldisa/Arduino/build/linux/work
-ARD_CMD_HOME=$(ARD_HOME)
-ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
-ARD_CMD_HOME=c:/PROGRA~1/Arduino
-endif
+#ARD_HOME=/cygdrive/c/PROGRA~1/Arduino
+ARD_HOME=/home/uldisa/Arduino/build/linux/work
 
-ARDMK_PATH=$(ARD_HOME)/hardware/tools/avr/bin
-CFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
-CXXFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154
+ARDMK_PATH=$(ARD_HOME)/hardware/tools/avr
+CFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154 -DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
+CXXFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154 -DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
+LDFLAGS=-mmcu=atmega2560 -Wl,--gc-sections -lc -lm
 
 CC_NAME      = avr-gcc
 CXX_NAME     = avr-g++
@@ -20,14 +17,14 @@ SIZE_NAME    = avr-size
 NM_NAME      = avr-nm
 
 # Names of executables
-CC      = $(ARDMK_PATH)/$(CC_NAME)
-CXX     = $(ARDMK_PATH)/$(CXX_NAME)
-AS      = $(ARDMK_PATH)/$(AS_NAME)
-OBJCOPY = $(ARDMK_PATH)/$(OBJCOPY_NAME)
-OBJDUMP = $(ARDMK_PATH)/$(OBJDUMP_NAME)
-AR      = $(ARDMK_PATH)/$(AR_NAME)
-SIZE    = $(ARDMK_PATH)/$(SIZE_NAME)
-NM      = $(ARDMK_PATH)/$(NM_NAME)
+CC      = $(ARDMK_PATH)/bin/$(CC_NAME)
+CXX     = $(ARDMK_PATH)/bin/$(CXX_NAME)
+AS      = $(ARDMK_PATH)/bin/$(AS_NAME)
+OBJCOPY = $(ARDMK_PATH)/bin/$(OBJCOPY_NAME)
+OBJDUMP = $(ARDMK_PATH)/bin/$(OBJDUMP_NAME)
+AR      = $(ARDMK_PATH)/bin/$(AR_NAME)
+SIZE    = $(ARDMK_PATH)/bin/$(SIZE_NAME)
+NM      = $(ARDMK_PATH)/bin/$(NM_NAME)
 REMOVE  = rm -rf
 MV      = mv -f
 CAT     = cat
@@ -39,17 +36,41 @@ ifneq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
 CC_CMD=$(CC) $(CPPFLAGS) $(CFLAGS) -c `cygpath -m $<` -o $(foreach f,$@,`cygpath -m $(f)`)
 CXX_CMD=$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c `cygpath -m $<` -o $(foreach f,$@,`cygpath -m $(f)`)
 endif
-%.hex: %.elf
-	$(OBJCOPY) -O ihex $< $@ 
+%.cpp: %.ino
+	echo '#line 1 "$<"' > $@
+	echo '#include "Arduino.h"' >> $@
+	echo 'void setup();' >> $@
+	echo 'void loop();' >> $@
+	echo '#line 1 ' >> $@
+	cat $< >> $@	
+
 %.elf: %.o 
 	$(CC) $(LDFLAGS) -o $@ $^ -lc -lm
+
+%.eep: %.elf
+	$(OBJCOPY) -O ihex -j .eeprom $< $@ 
+
+%.hex: %.elf
+	$(OBJCOPY) -O ihex -R .eeprom $< $@ 
+
 %.prog: %.hex
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
-	$(ARDMK_PATH)/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -U flash:w:$<:i -C $(ARDMK_PATH)/../etc/avrdude.conf
+	$(ARDMK_PATH)/../avrdude -v -v -p atmega2560 -cwiring -P/dev/ttyACM1 -b115200 -U flash:w:$<:i -C $(ARDMK_PATH)/../avrdude.conf
 else
-	$(ARDMK_PATH)/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -U flash:w:$<:i -C `cygpath -m $(ARDMK_PATH)/../etc/avrdude.conf`
+	$(ARDMK_PATH)/bin/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -U flash:w:$<:i -C `cygpath -m $(ARDMK_PATH)/../etc/avrdude.conf`
 endif
 
+########################
+LIBS=SD SPI WiFi
+test.elf: libcore.a libSD.a libSPI.a
+Blink.elf: libcore.a
+
+print-%:
+	@echo "$($(*))"
+clean::
+	rm -f $(foreach l,core $(LIBS),lib$(l).a)
+	rm -Rf $(foreach l,core $(LIBS),$(l)/)
+	rm -f *.o *.elf *.epp *.hex
 
 OBJDIR=.
 ###### ALL Arduino core libraries
@@ -63,7 +84,6 @@ LIBcore_C_SRCS     = $(wildcard $(ARDUINO_CORE_PATH)/*.c)
 LIBcore_CPP_SRCS   = $(wildcard $(ARDUINO_CORE_PATH)/*.cpp)
 
 ###### External libraries
-LIBS=SD SPI WiFi
 ARD_LIB_PATH=$(ARD_HOME)/libraries
 
 define get_lib_sources
@@ -102,22 +122,6 @@ lib$1.a:$$(LIB$1_OBJS)
 endef
 $(foreach l,core $(LIBS),$(eval $(call create_lib,$(l))))
 
-#$$(LIB$1_OBJS):CFLAGS+=$$(COREINCL) $$(LIB$1INCL)
-#$$(LIB$1_OBJS):CXXFLAGS+=$$(COREINCL) $$(LIB$1INCL)
-
 CFLAGS+=$(foreach l,$(LIBS) core,$(LIB$lINCL))
 CXXFLAGS+=$(foreach l,$(LIBS) core,$(LIB$lINCL))
 
-$(info aaaa $(LIBSD_OBJS))
-#$(foreach l,$(LIBS),$(eval $(call ard_lib,$(l),$(ARD_LIB_PATH)/$(l))))
-$(info aaaa $(LIBSD_OBJS))
-########################
-
-
-test.elf: libcore.a libSD.a libSPI.a
-test.elf: LDFLAGS+=-mmcu=atmega2560 -Wl,--gc-sections -lc -lm
-
-print-%:
-	@echo "$($(*))"
-clean:
-	rm -f *.o libcore.a 
