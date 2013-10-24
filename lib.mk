@@ -2,9 +2,9 @@
 ARDUINO_CORE_PATH=$(ARD_HOME)/hardware/arduino/avr/cores/arduino
 # Generate CPPFLAGS
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
-CORE_INCLUDES:=-I$(ARDUINO_CORE_PATH) -I$(ARDUINO_CORE_PATH)/../../variants/mega
+CORE_INCLUDES:=-I$(ARDUINO_CORE_PATH) -I$(ARDUINO_CORE_PATH)/../../variants/$(VARIANT)
 else
-CORE_INCLUDES:=-I$(shell cygpath -m $(ARDUINO_CORE_PATH)) -I$(shell cygpath -m $(ARDUINO_CORE_PATH)/../../variants/mega)
+CORE_INCLUDES:=-I$(shell cygpath -m $(ARDUINO_CORE_PATH)) -I$(shell cygpath -m $(ARDUINO_CORE_PATH)/../../variants/$(VARIANT))
 endif
 CPPFLAGS+=$(CORE_INCLUDES)
 

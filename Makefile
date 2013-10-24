@@ -7,8 +7,8 @@ ARD_HOME=$(word 1, $(foreach ard,$(MY_ARD_LOCATIONS),$(wildcard $(ard))))
 
 ARDMK_PATH=$(ARD_HOME)/hardware/tools/avr
 
-CPPFLAGS=-mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=154 -DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
-LDFLAGS=-mmcu=atmega2560 -Wl,--gc-sections 
+CPPFLAGS=-mmcu=$(CPU) -DF_CPU=16000000L -DARDUINO=154 #-DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
+LDFLAGS=-mmcu=$(CPU) -Wl,--gc-sections 
 
 CC_NAME      = avr-gcc
 CXX_NAME     = avr-g++
@@ -53,9 +53,9 @@ endif
 
 %.prog: %.hex
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
-	$(ARDMK_PATH)/../avrdude -v -v -p atmega2560 -cwiring -P$(PORT) -b115200 -V -D -U flash:w:$<:i -C $(ARDMK_PATH)/../avrdude.conf
+	$(ARDMK_PATH)/../avrdude -v -v -p $(CPU) -cwiring -P$(PORT) -b115200 -V -D -U flash:w:$<:i -C $(ARDMK_PATH)/../avrdude.conf
 else
-	$(ARDMK_PATH)/bin/avrdude -v -v -p atmega2560 -cwiring -PCOM11 -b115200 -V -D -U flash:w:$<:i -C `cygpath -m $(ARDMK_PATH)/../etc/avrdude.conf`
+	$(ARDMK_PATH)/bin/avrdude -v -v -p $(CPU) -cwiring -P$(PORT) -b9600 -V -D -U flash:w:$<:i -C `cygpath -m $(ARDMK_PATH)/etc/avrdude.conf`
 endif
 
 ########################
