@@ -3,12 +3,14 @@ include ../Makefile
 LIBS=core
 #PORT=/dev/ttyACM1
 #CPU=atmega2560
+#BR=115200
 #CPPFLAGS+=-DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
 #VARIANT=mega
 PORT=COM9
 CPU=atmega328p
-CPPFLAGS+=-DARDUINO_AVR_MINI -DARDUINO_ARCH_AVR
-VARIANT=eightanaloginputs
+BR=57600
+CPPFLAGS+=-DARDUINO_AVR_PRO -DARDUINO_ARCH_AVR
+VARIANT=standard
 include ../lib.mk
 
 Blink.elf: libcore.a
