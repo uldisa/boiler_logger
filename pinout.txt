@@ -1,0 +1,18 @@
+20 - +5V      _|_      +5V - 21 
+22 - /key             key\ - 23
+24 -  key  Keypad     key  - 25
+26 -  key             key/ - 27
+28 - \key     _|         0 - 29
+30 - 0         |         0 - 31
+32 - /Clk    \ |         0 - 33
+34 - |Din  L  || 18b20 2DQ - 35
+36 - |DC   C  ||         0 - 37
+38 - |CE   D  || /R   RST\ - 39
+40 - |RST     ||  T    IO  - 41
+42 - \ BL    / | \C   SCK/ - 43
+44 - O         |           - 45
+46 - O         |           - 47
+48 -           |           - 49
+50 - / MISO         MOSI \ - 51
+52 - \ SCM   DS card  CS / - 53
+54 - GND       |       GND - 55
