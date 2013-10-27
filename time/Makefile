@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core
+LIBS=core SD SPI
 #PORT=/dev/ttyACM1
 PORT=COM11
 CPU=atmega2560
@@ -16,7 +16,7 @@ PROGRAMMER=wiring
 #PROGRAMMER=arduino
 include ../lib.mk
 CPPFLAGS+=-I.
-time.elf: DS1302.o libcore.a
+time.elf: DS1302.o libSD.a libSPI.a libcore.a
 
 p:time.prog
 

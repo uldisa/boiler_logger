@@ -17,17 +17,18 @@ ARD_LIB_PATH=$(ARD_HOME)/libraries
 
 # Find library sources
 ifeq "$(filter clean,$(MAKECMDGOALS))" ""
-$(foreach l,$(filter-out core,$(LIBS)),$(if $(wildcard $(ARD_LIB_PATH)/$l),,$(error Library $l no found in $(ARD_LIB_PATH)/$l)))
+$(foreach l,$(filter-out core,$(LIBS)),$(if $(wildcard $(ARD_LIB_PATH)/$l $(USER_LIB_PATH)/$l),,$(error Library $l no found in $(ARD_LIB_PATH)/$l)))
 endif
 
 define get_lib_sources
-LIB$1_C     = $(foreach d,src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.c))
-LIB$1_CPP   = $(foreach d,src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.cpp))
+LIB$1_C     += $(foreach d,. src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.c))
+LIB$1_CPP   += $(foreach d,. src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.cpp))
 endef
 $(foreach l,$(filter-out core,$(LIBS)),$(eval $(call get_lib_sources,$(l),$(ARD_LIB_PATH)/$(l))))
+$(foreach l,$(filter-out core,$(LIBS)),$(eval $(call get_lib_sources,$(l),$(USER_LIB_PATH)/$(l))))
 
 # Generate CPPFLAGS
-LIB_INCLUDES:=$(foreach l,$(filter-out core,$(LIBS)),$(foreach d,src arch/avr,$(dir $(wildcard $(ARD_LIB_PATH)/$(l)/$(d)/*.h))))
+LIB_INCLUDES:=$(foreach l,$(filter-out core,$(LIBS)),$(foreach d,. src arch/avr,$(dir $(wildcard $(ARD_LIB_PATH)/$(l)/$(d)/*.h $(USER_LIB_PATH)/$(l)/$(d)/*.h))))
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
 LIB_INCLUDES:=$(addprefix -I,$(LIB_INCLUDES))
 else

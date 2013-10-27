@@ -10,10 +10,23 @@
 //          SCLK pin  -> Arduino Digital 4
 
 #include <DS1302.h>
+#include <SPI.h>
+#include <SD.h>
 
 // Init the DS1302
 DS1302 rtc(39, 41, 43);
 
+bool SDinit(void) {
+  Serial.print("Initializing SD card...");
+  pinMode(53, OUTPUT);
+
+  if (!SD.begin(53)) {
+    Serial.println("initialization failed!");
+    return false;
+  }
+  Serial.println("initialization done.");
+  return true;
+}
 void setup()
 {
   // Set the clock to run-mode, and disable the write protection
@@ -22,6 +35,7 @@ void setup()
   
   // Setup Serial connection
   Serial.begin(9600);
+  SDinit();
 
   // The following lines can be commented out to use the values already stored in the DS1302
   //rtc.setDOW(FRIDAY);        // Set Day-of-Week to FRIDAY

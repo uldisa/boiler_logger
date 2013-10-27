@@ -5,6 +5,9 @@ MY_ARD_LOCATIONS= \
 # Take first found Arduino location. No need to change Makefile when changin development site
 ARD_HOME=$(word 1, $(foreach ard,$(MY_ARD_LOCATIONS),$(wildcard $(ard))))
 
+MY_USER_LIB_LOCATIONS=/cygdrive/c/DOCUME~1/test/MYDOCU~1/Arduino/LIBRAR~1
+USER_LIB_PATH=$(word 1, $(foreach ard,$(MY_USER_LIB_LOCATIONS),$(wildcard $(ard))))
+
 ARDMK_PATH=$(ARD_HOME)/hardware/tools/avr
 
 CPPFLAGS=-mmcu=$(CPU) -DF_CPU=16000000L -DARDUINO=154 #-DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
@@ -53,12 +56,12 @@ endif
 
 %.prog: %.hex
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
-	$(ARDMK_PATH)/../avrdude -v -v -p $(CPU) -cwiring -P$(PORT) -b$(BR) -V -D -U flash:w:$<:i -C $(ARDMK_PATH)/../avrdude.conf
+	$(ARDMK_PATH)/../avrdude -v -v -p $(CPU) -c$(PROGRAMMER) -P$(PORT) -b$(BR) -V -D -U flash:w:$<:i -C $(ARDMK_PATH)/../avrdude.conf
 else
 	@CFG="`cygpath -m $(ARDMK_PATH)/etc/avrdude.conf`" ; \
 	PS4=; \
 	set -x; \
-	$(ARDMK_PATH)/bin/avrdude -v -v -v -v -p $(CPU) -carduino -P$(PORT) -b$(BR) -V -D -U flash:w:$<:i -C$$CFG 
+	$(ARDMK_PATH)/bin/avrdude -v -v -v -v -p $(CPU) -c$(PROGRAMMER) -P$(PORT) -b$(BR) -V -D -U flash:w:$<:i -C$$CFG 
 endif
 
 ########################

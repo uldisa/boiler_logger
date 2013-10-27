@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core OneWire DallasTemperature
+LIBS=core OneWire DallasTemperature TimerOne
 #PORT=/dev/ttyACM1
 PORT=COM11
 CPU=atmega2560
@@ -17,7 +17,7 @@ PROGRAMMER=wiring
 include ../lib.mk
 #CPPFLAGS+=-I.
 temp.elf: libOneWire.a libDallasTemperature.a libcore.a
-m.elf: libOneWire.a libDallasTemperature.a libcore.a
+m.elf: libOneWire.a libDallasTemperature.a libTimerOne.a libcore.a
 
 p:temp.prog
 
