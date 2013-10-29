@@ -49,10 +49,11 @@ endif
 	$(CC) $(LDFLAGS) -o $@ $^ -lc -lm
 
 %.eep: %.elf
-	$(OBJCOPY) -O ihex -j .eeprom $< $@ 
+	$(OBJCOPY) -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load --no-change-warnings --change-section-lma .eprom=0 $< $@ 
 
 %.hex: %.elf
 	$(OBJCOPY) -O ihex -R .eeprom $< $@ 
+	$(SIZE) $@ 
 
 %.prog: %.hex
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
