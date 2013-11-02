@@ -16,7 +16,7 @@ CPPFLAGS+=-DARDUINO_AVR_PRO -DARDUINO_ARCH_AVR
 VARIANT=standard
 PROGRAMMER=arduino
 include ../lib.mk
-CPPFLAGS+=-I. -Os -fno-exceptions -ffunction-sections -fdata-sections
+CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
 main.elf: main.o DS1302.o libDallasTemperature.a libOneWire.a libcore.a
 # compile project:
 # make Blink.elf
