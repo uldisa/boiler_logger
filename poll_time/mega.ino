@@ -16,7 +16,7 @@
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-const int chipSelect = 10;    
+const int SD_chipSelect = 53;    
 volatile bool SD_ready=false;
 SdFile SD_file;
 int SD_file_date=0; 
@@ -34,8 +34,8 @@ Time DL_time;
 unsigned long last_millis = 0;
 volatile bool TS_readingInProgress = false;
 bool SD_init(void);
-DS1302 rtc(2, 3, 4);
-OneWire TS_oneWire(5);
+DS1302 rtc(43,41,39);
+OneWire TS_oneWire(35);
 DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
@@ -71,7 +71,9 @@ void TS_waitConversion(unsigned int conversionDelay) {
 // THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE.
 // Timer 2 makes sure that we take a reading every 2 miliseconds
 void DL_recordToBuffer(void){
-	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){return;}
+	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){
+		return;
+	}
 	DL_buffer_position+=sprintf(DL_buffer_position,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		DL_buffer_position+=sprintf(DL_buffer_position,"\t%d.%d",TS_temperatureRaw[i]>>4,(TS_temperatureRaw[i]&0xF)*625);
@@ -127,7 +129,8 @@ ISR(TIMER2_COMPA_vect) {
 		// If Nested timer not done, skip the beat.
 		return;
 	}
-	PORTB ^= 0b00000010;
+	digitalWrite(5,!digitalRead(5));
+	//PORTB ^= 0b00000010;
 	// Get current date
 	DL_timeInProgress=true;
 	DL_time=rtc.getTime();
@@ -144,7 +147,8 @@ ISR(TIMER2_COMPA_vect) {
 }
 ISR(TIMER2_COMPB_vect) {
 	TS_readingInProgress = true;
-	PORTB ^= 0b00000001;
+	digitalWrite(6,!digitalRead(6));
+	//PORTB ^= 0b00000001;
 	TIMSK2 &= ~0b00000100;	//Do it once
 	// Loop through each device, print out temperature data
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
@@ -182,7 +186,8 @@ ISR(TIMER2_OVF_vect) {
 			TIMSK2 |= 0b00000100;
 		}
 	}
-	PORTD ^= 0b10000000;
+	//PORTD ^= 0b10000000;
+	digitalWrite(7,!digitalRead(7));
 
 }
 
@@ -258,7 +263,7 @@ bool SD_init(void)
 #endif
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
-  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+  if (!card.init(SPI_HALF_SPEED, SD_chipSelect)) {
 #ifdef DEBUG
     Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
     Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
@@ -333,11 +338,17 @@ bool SD_init(void)
 }
 void setup() {
 	cli();
-	PORTD ^= ~0b1000000;		//Pull down PORTD pins
+	pinMode(5, OUTPUT); 
+	pinMode(6, OUTPUT); 
+	pinMode(7, OUTPUT); 
+	digitalWrite(5, LOW); 
+	digitalWrite(6, LOW); 
+	digitalWrite(7, LOW); 
+/*	PORTD ^= ~0b1000000;		//Pull down PORTD pins
 	PORTB ^= ~0b0000011;		//Pull down PORTB pins
 	DDRD |= 0b10000000;	//Enable output for led pin 7
 	DDRB |= 0b00000011;	//Enable output for led pins 8, 9
-	pinMode(10, OUTPUT);     // change this to 53 on a mega
+*/	pinMode(SD_chipSelect, OUTPUT);     // change this to 53 on a mega
 #ifdef DEBUG
 	Serial.begin(115200);
 #endif
@@ -352,6 +363,7 @@ void setup() {
 	rtc.setDate(3, 11, 2013);   // Set the date to August 6th, 2010
 */
 	DL_recordToBuffer();
+	Serial.println(DL_buffer);
 	DL_writeToFile(DL_buffer_position);
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
