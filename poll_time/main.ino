@@ -3,6 +3,9 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "DS1302.h"
+#include <SPI.h>
+#include <SD.h>
+
 
 #define DEBUG 1
 
@@ -10,19 +13,32 @@
  * TS - Temperature Sensor related code
  * DL - Data logging related code
  */
+Sd2Card card;
+SdVolume volume;
+SdFile root;
+const int chipSelect = 10;    
+volatile bool SD_ready=false;
+SdFile SD_file;
+int SD_file_date=0; 
 
-DS1302 rtc(2, 3, 4);
-char TS_precision = 9;
+char TS_precision = 12;
 unsigned int TS_conversionDelay = 0;
-OneWire TS_oneWire(5);
-DallasTemperature TS(&TS_oneWire);
-DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 volatile int16_t TS_temperatureRaw[8];	// We'll use this variable to store a found device address
 
 unsigned int DL_Timer1hz = 15625;	//Hz 16Mhz with 1024 prescale.
-unsigned int DL_period = 1000;	//Data Loggin (attempt) period in milliseconds
+unsigned int DL_period = 60000;	//Data Loggin (attempt) period in milliseconds
 volatile unsigned int DL_periodOverflows = 0;
 volatile unsigned int TS_conversionOverflows = 0;
+volatile bool DL_timeInProgress=false;
+Time DL_time;
+unsigned long last_millis = 0;
+volatile bool TS_readingInProgress = false;
+bool SD_init(void);
+DS1302 rtc(2, 3, 4);
+OneWire TS_oneWire(5);
+DallasTemperature TS(&TS_oneWire);
+DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
+char buff[100];
 
 void DL_startPeriod(void) {
 	//Calculate params for next wakup
@@ -53,33 +69,76 @@ void TS_waitConversion(unsigned int conversionDelay) {
 
 // THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE.
 // Timer 2 makes sure that we take a reading every 2 miliseconds
-unsigned long last_millis = 0;
-volatile bool reading_in_progress = false;
 ISR(TIMER2_COMPA_vect) {
 	DL_startPeriod();
 	if (TIMSK2 & 0b00000100 || TS_conversionOverflows > 0
-	    || reading_in_progress) {
+	    || TS_readingInProgress) {
 		// If Nested timer not done, skip the beat.
 		return;
 	}
-	PORTB ^= 1 << PINB4;
-#ifdef DEBUG
-	Serial.println(rtc.getTimeStr());
-#endif
+	PORTB ^= 0b00000010;
+	// Get current date
+	DL_timeInProgress=true;
+	DL_time=rtc.getTime();
+	DL_timeInProgress=false;
 	TS.requestTemperatures();	// Send the command to get temperatures
 	TS_waitConversion(TS_conversionDelay);
-
+	if(!SD_ready){
+		Serial.println("skip writing");
+		return;
+	//	if(!(SD_ready=SD_init()))return;
+	}
+	//close file, if file name has changed.	
+	// filename based on date
+	if(SD_file_date!=DL_time.date) {
+		SD_file.close();
+		SD_file_date=DL_time.date;
+	}	
+	if(!SD_file.isOpen()) {
+		//Generate file name
+		sprintf(buff,"%04d%02d%02d.log",DL_time.year,DL_time.mon,DL_time.date);
+		Serial.print("Opening file ");
+		Serial.println(buff);
+		if(!SD_file.open(root,buff,O_CREAT|O_WRITE|O_APPEND)) {
+			Serial.print("Opening file failed");
+			Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+			Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+			SD_ready=false;
+			return;
+		}
+	}
+	char *p=buff;	
+	p+=sprintf(p,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
+	for (int i = 0; i < TS.getDeviceCount(); i++) {
+		p+=sprintf(p,"\t%d.%d",TS_temperatureRaw[i]>>4,(TS_temperatureRaw[i]&0xF)*625);
+	}
+	p+=sprintf(p,"\r\n");
+	Serial.print(buff);
+	if(!SD_file.write(buff)) {
+		Serial.print("Writing file failed");
+		Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+		Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+		SD_ready=false;
+		return;
+	}
+	if(!SD_file.sync()) {
+		Serial.print("Syncing file failed");
+		Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+		Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+		SD_ready=false;
+		return;
+	}
 }
 ISR(TIMER2_COMPB_vect) {
-	reading_in_progress = true;
-	PORTB ^= 1 << PINB3;
+	TS_readingInProgress = true;
+	PORTB ^= 0b00000001;
 	TIMSK2 &= ~0b00000100;	//Do it once
 	// Loop through each device, print out temperature data
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		TS_temperatureRaw[i] = TS.getTemp(TS_DA[i]);
 	}
-	reading_in_progress = false;
-#ifdef DEBUG
+	TS_readingInProgress = false;
+/*#ifdef DEBUG
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		Serial.print("T");
 		Serial.print(i, DEC);
@@ -89,7 +148,7 @@ ISR(TIMER2_COMPB_vect) {
 		//else ghost device! Check your power requirements and cabling
 	}
 	Serial.println(" ");
-#endif
+#endif*/
 }
 ISR(TIMER2_OVF_vect) {
 	if (DL_periodOverflows) {
@@ -110,7 +169,7 @@ ISR(TIMER2_OVF_vect) {
 			TIMSK2 |= 0b00000100;
 		}
 	}
-	PORTB ^= 1 << PINB2;
+	PORTD ^= 0b10000000;
 
 }
 
@@ -130,7 +189,7 @@ void TS_init(void) {
 	//DallasTemperature wrapper from OneWire reset_search. 
 	TS.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
-	int initdelay = 2;
+/*	int initdelay = 2;
 	while (TS.getDeviceCount() == 0) {
 		if (initdelay < 8000) {
 			initdelay <<= 1;
@@ -148,7 +207,7 @@ void TS_init(void) {
 			delay(initdelay);
 		}
 
-	}
+	}*/
 	// Loop through each device, print out address
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		// Search the wire for address
@@ -177,18 +236,111 @@ void TS_init(void) {
 	}
 }
 
+bool SD_init(void)
+{
+#ifdef DEBUG
+  Serial.print("\nInitializing SD card...");
+#endif
+  // we'll use the initialization code from the utility libraries
+  // since we're just testing if the card is working!
+  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+#ifdef DEBUG
+    Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+    Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+    Serial.println("initialization failed. Things to check:");
+    Serial.println("* is a card is inserted?");
+    Serial.println("* Is your wiring correct?");
+    Serial.println("* did you change the chipSelect pin to match your shield or module?");
+#endif
+    return false;
+  } else {
+#ifdef DEBUG
+   Serial.println("Wiring is correct and a card is present."); 
+#endif
+  }
+#ifdef DEBUG
+  // print the type of card
+  Serial.print("\nCard type: ");
+  switch(card.type()) {
+    case SD_CARD_TYPE_SD1:
+      Serial.println("SD1");
+      break;
+    case SD_CARD_TYPE_SD2:
+      Serial.println("SD2");
+      break;
+    case SD_CARD_TYPE_SDHC:
+      Serial.println("SDHC");
+      break;
+    default:
+      Serial.println("Unknown");
+  }
+#endif
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+#ifdef DEBUG
+    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+    Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+    Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+#endif
+    return false;
+  }
+
+#ifdef DEBUG
+  // print the type and size of the first FAT-type volume
+  uint32_t volumesize;
+  Serial.print("\nVolume type is FAT");
+  Serial.println(volume.fatType(), DEC);
+  Serial.println();
+  
+  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+  volumesize *= 512;                            // SD card blocks are always 512 bytes
+  Serial.print("Volume size (bytes): ");
+  Serial.println(volumesize);
+  Serial.print("Volume size (Kbytes): ");
+  volumesize /= 1024;
+  Serial.println(volumesize);
+  Serial.print("Volume size (Mbytes): ");
+  volumesize /= 1024;
+  Serial.println(volumesize);
+
+  
+  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
+#endif
+  root.openRoot(volume);
+  
+#ifdef DEBUG
+  // list all files in the card with date and size
+  root.ls(LS_R | LS_DATE | LS_SIZE);
+#endif
+  return true;
+}
 void setup() {
 	cli();
-	PORTB = 0;		//Pull down PORTB pins
-	DDRB = (1 << DDB4) | (1 << DDB3) | (1 << DDB2);	//Enable output for led pins 12, 11, 10 
+	PORTD ^= ~0b1000000;		//Pull down PORTD pins
+	PORTB ^= ~0b0000011;		//Pull down PORTB pins
+	DDRD |= 0b10000000;	//Enable output for led pin 7
+	DDRB |= 0b00000011;	//Enable output for led pins 8, 9
+	pinMode(10, OUTPUT);     // change this to 53 on a mega
 #ifdef DEBUG
 	Serial.begin(115200);
 #endif
 	TS_init();		//Initialize temperature sensors
+/*	rtc.setDOW(SUNDAY);        // Set Day-of-Week to FRIDAY
+	rtc.setTime(3, 25, 0);     // Set the time to 12:00:00 (24hr format)
+	rtc.setDate(3, 11, 2013);   // Set the date to August 6th, 2010
+*/
+	DL_time=rtc.getTime();
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
-	sei();			//Enable interrupts
+
+	// On the Ethernet Shield, CS is pin 4. It's set as an output by default.
+	// Note that even if it's not used as the CS pin, the hardware SS pin 
+	// (10 on most Arduino boards, 53 on the Mega) must be left as an output 
+	// or the SD library functions will not work. 
+
+//	sei();			//Enable interrupts
 	DL_startPeriod();	//Start data logging interval hartbeat
 #ifdef DEBUG
 	Serial.println("init done");
@@ -200,10 +352,17 @@ char old_second = 0;
 unsigned long ticks = 0;
 */
 void loop() {
+//	cli();
+	SD_ready=SD_init();
+//	sei();
+	while(SD_ready) {
+		asm("nop");
+
+	}
 /*	cli();
 	second = rtc._readRegister(0);
 	sei();
-	ticks++;
+	ticks
 	if (old_second != second) {
 		Serial.print(millis(), DEC);
 		Serial.print(" ");
