@@ -14,7 +14,7 @@
 #include <SD.h>
 
 // Init the DS1302
-DS1302 rtc(39, 41, 43);
+DS1302 rtc(29, 31, 33);
 
 bool SDinit(void) {
   Serial.print("Initializing SD card...");
@@ -34,7 +34,7 @@ void setup()
   //rtc.writeProtect(false);
   
   // Setup Serial connection
-  Serial.begin(9600);
+  Serial.begin(115200);
   SDinit();
 
   // The following lines can be commented out to use the values already stored in the DS1302

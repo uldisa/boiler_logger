@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <MemoryFree.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "DS1302.h"
@@ -7,7 +8,7 @@
 #include <SD.h>
 
 
-#define DEBUG 1
+#define DEBUG  1
 
 /* Naming:
  * TS - Temperature Sensor related code
@@ -35,11 +36,14 @@ unsigned long last_millis = 0;
 volatile bool TS_readingInProgress = false;
 bool SD_init(void);
 DS1302 rtc(2, 3, 4);
-OneWire TS_oneWire(5);
+volatile unsigned long DL_counter = 0;
+OneWire TS_oneWire(6);
 DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
-char DL_buffer[100];
+char DL_buffer[350];
+#define SYNC 10000
+volatile unsigned long last_sync=0;
 
 void DL_startPeriod(void) {
 	//Calculate params for next wakup
@@ -71,8 +75,15 @@ void TS_waitConversion(unsigned int conversionDelay) {
 // THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE.
 // Timer 2 makes sure that we take a reading every 2 miliseconds
 void DL_recordToBuffer(void){
-	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){return;}
-	DL_buffer_position+=sprintf(DL_buffer_position,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
+	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){
+		Serial.print("no space in buffer ");
+		Serial.print(DL_buffer_position-DL_buffer,DEC);
+		Serial.print(" > ");
+		Serial.println(sizeof(DL_buffer)-70,DEC);
+		return;
+	}
+//	DL_buffer_position+=sprintf(DL_buffer_position,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
+	DL_buffer_position+=sprintf(DL_buffer_position,"%d",DL_counter);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		DL_buffer_position+=sprintf(DL_buffer_position,"\t%d.%d",TS_temperatureRaw[i]>>4,(TS_temperatureRaw[i]&0xF)*625);
 	}
@@ -93,7 +104,8 @@ bool DL_writeToFile(const char *buff){
 	if(!SD_file.isOpen()) {
 		char buff[13];
 		//Generate file name
-		sprintf(buff,"%04d%02d%02d.log",DL_time.year,DL_time.mon,DL_time.date);
+		//sprintf(buff,"%04d%02d%02d.log",DL_time.year,DL_time.mon,DL_time.date);
+		sprintf(buff,"default.log");
 		Serial.print("Opening file ");
 		Serial.println(buff);
 		if(!SD_file.open(root,buff,O_CREAT|O_WRITE|O_APPEND)) {
@@ -111,16 +123,24 @@ bool DL_writeToFile(const char *buff){
 		SD_ready=false;
 		return false;
 	}
-	if(!SD_file.sync()) {
-		Serial.print("Syncing file failed");
-		Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-		Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
-		SD_ready=false;
-		return false;
-	}
+	if(millis()-last_sync > SYNC){
+		last_sync=millis();
+		Serial.println("Syncin");
+		if(!SD_file.sync()) {
+			Serial.print("Syncing file failed");
+			Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
+			Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+			//SD_ready=false;
+			//return false;
+		}
+	}	
 	return true;
 }
 ISR(TIMER2_COMPA_vect) {
+	Serial.print("mem=");
+	Serial.println(freeMemory());
+
+	DL_counter++;
 	DL_startPeriod();
 	if (TIMSK2 & 0b00000100 || TS_conversionOverflows > 0
 	    || TS_readingInProgress) {
@@ -202,8 +222,8 @@ void TS_init(void) {
 	//DallasTemperature wrapper from OneWire reset_search. 
 	TS.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
-/*	int initdelay = 2;
-	while (TS.getDeviceCount() == 0) {
+	int initdelay = 2;
+	while (TS.getDeviceCount() == 0 && initdelay < 4000) {
 		if (initdelay < 8000) {
 			initdelay <<= 1;
 		}
@@ -220,7 +240,7 @@ void TS_init(void) {
 			delay(initdelay);
 		}
 
-	}*/
+	}
 	// Loop through each device, print out address
 	TS.setWaitForConversion(true);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
@@ -253,12 +273,14 @@ void TS_init(void) {
 
 bool SD_init(void)
 {
+  SD_file.close(); //drop open flag
 #ifdef DEBUG
   Serial.print("\nInitializing SD card...");
 #endif
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
-  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+ // if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+  if (!card.init(SPI_FULL_SPEED, chipSelect)) {
 #ifdef DEBUG
     Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
     Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
@@ -329,6 +351,7 @@ bool SD_init(void)
   // list all files in the card with date and size
   root.ls(LS_R | LS_DATE | LS_SIZE);
 #endif
+  
   return true;
 }
 void setup() {
@@ -341,6 +364,8 @@ void setup() {
 #ifdef DEBUG
 	Serial.begin(115200);
 #endif
+	Serial.print("0 mem=");
+	Serial.println(freeMemory());
 	DL_buffer_position=DL_buffer;
 
 	DL_time=rtc.getTime();
@@ -352,7 +377,10 @@ void setup() {
 	rtc.setDate(3, 11, 2013);   // Set the date to August 6th, 2010
 */
 	DL_recordToBuffer();
-	DL_writeToFile(DL_buffer_position);
+	if(DL_writeToFile(DL_buffer)){
+		Serial.print(DL_buffer);
+		DL_buffer_position=DL_buffer;
+	}
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
@@ -362,11 +390,13 @@ void setup() {
 	// (10 on most Arduino boards, 53 on the Mega) must be left as an output 
 	// or the SD library functions will not work. 
 
-//	sei();			//Enable interrupts
+	sei();			//Enable interrupts
 	DL_startPeriod();	//Start data logging interval hartbeat
 #ifdef DEBUG
 	Serial.println("init done");
 #endif
+	Serial.print("1 mem=");
+	Serial.println(freeMemory());
 }
 
 /*char second = 0;

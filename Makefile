@@ -53,7 +53,7 @@ endif
 
 %.hex: %.elf
 	$(OBJCOPY) -O ihex -R .eeprom $< $@ 
-	$(SIZE) $@ 
+	$(SIZE) -C $< --mcu=$(CPU)
 
 %.prog: %.hex
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)

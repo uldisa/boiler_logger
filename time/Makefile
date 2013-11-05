@@ -15,7 +15,7 @@ PROGRAMMER=wiring
 #VARIANT=standard
 #PROGRAMMER=arduino
 include ../lib.mk
-CPPFLAGS+=-I.
+CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
 time.elf: DS1302.o libSD.a libSPI.a libcore.a
 
 p:time.prog

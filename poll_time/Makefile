@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core OneWire DallasTemperature SD SPI
+LIBS=core MemoryFree OneWire DallasTemperature SD SPI
 #PORT=/dev/ttyACM1
 #PORT=COM11
 #CPU=atmega2560
@@ -17,7 +17,8 @@ VARIANT=standard
 PROGRAMMER=arduino
 include ../lib.mk
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
-main.elf: main.o DS1302.o libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
+mega.elf: mega.o DS1302.o libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
+main.elf: main.o DS1302.o libMemoryFree.a libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
 # compile project:
 # make Blink.elf
 
