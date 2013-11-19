@@ -27,7 +27,7 @@ unsigned int TS_conversionDelay = 0;
 volatile int16_t TS_temperatureRaw[8];	// We'll use this variable to store a found device address
 
 unsigned int DL_Timer1hz = 15625;	//Hz 16Mhz with 1024 prescale.
-unsigned int DL_period = 1000;	//Data Loggin (attempt) period in milliseconds
+unsigned int DL_period = 60000;	//Data Loggin (attempt) period in milliseconds
 volatile unsigned int DL_periodOverflows = 0;
 volatile unsigned int TS_conversionOverflows = 0;
 volatile bool DL_timeInProgress=false;
@@ -41,7 +41,7 @@ OneWire TS_oneWire(6);
 DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
-char DL_buffer[350];
+char DL_buffer[100];
 #define SYNC 10000
 volatile unsigned long last_sync=0;
 
@@ -72,26 +72,131 @@ void TS_waitConversion(unsigned int conversionDelay) {
 	}
 }
 
+#define HALLPIN A0
+int sensorValue=0;
+unsigned long readingEnd;
+//double average;
+volatile double total_average;
+volatile double raw_current;
+//double current;
+int    currentCnt;
+#define ZERO 511.85
+double getCurrent(void) {
+	total_average=0;
+	raw_current=0;
+//	current=0;
+	currentCnt=0;
+	sensorValue=analogRead(HALLPIN);
+	total_average+=sensorValue;
+//	sensorValue=(sensorValue>=513 && sensorValue<=515?514:sensorValue);
+//	average=analogRead(HALLPIN);
+//	average=(double)(average>=513.0 && average<=515.0?514.0:average);
+	readingEnd=millis()+20*2;
+	while(millis()<= readingEnd) {
+		sensorValue=analogRead(HALLPIN);
+		total_average+=sensorValue;
+//		sensorValue=(sensorValue>=513 && sensorValue<=515?514:sensorValue);
+//		average=(double)average+(sensorValue-average)/10.0;
+		if(sensorValue>ZERO) {
+			raw_current+=sensorValue-ZERO;
+		} else {
+			raw_current+=ZERO-sensorValue;
+		}	
+/*		if(average>ZERO) {
+			current+=average-ZERO;
+		} else {
+			current+=ZERO-average;
+		}	*/
+		currentCnt++;
+	}
+	total_average=(double)total_average/currentCnt;
+	raw_current=(double)raw_current/currentCnt*7.425;
+//	current=(double)current/currentCnt*7.425;
+	return raw_current;
+}
 // THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE.
 // Timer 2 makes sure that we take a reading every 2 miliseconds
+size_t sprintFloat(char *buff,double number, uint8_t digits) 
+{ 
+  char *p=buff;
+  
+  if (isnan(number)) return strcpy(p,"nan")-buff;
+  if (isinf(number)) return strcpy(p,"inf")-buff;
+  if (number > 4294967040.0) return strcpy(p,"ovf")-buff;  // constant determined empirically
+  if (number <-4294967040.0) return strcpy(p,"ovf")-buff;  // constant determined empirically
+  
+  // Handle negative numbers
+  if (number < 0.0)
+  {
+     *p ='-';
+     p++;
+     number = -number;
+  }
+
+  // Round correctly so that print(1.999, 2) prints as "2.00"
+  double rounding = 0.5;
+  for (uint8_t i=0; i<digits; ++i)
+    rounding /= 10.0;
+  
+  number += rounding;
+
+  // Extract the integer part of the number and print it
+  unsigned long int_part = (unsigned long)number;
+  double remainder = number - (double)int_part;
+  p += sprintf(p,"%ld",int_part);
+
+  // Print the decimal point, but only if there are digits beyond
+  if (digits > 0) {
+    *p='.';
+    p++; 
+  }
+
+  // Extract digits from the remainder one at a time
+  while (digits-- > 0)
+  {
+    remainder *= 10.0;
+    int toPrint = int(remainder);
+    p += sprintf(p,"%d",toPrint);
+    remainder -= toPrint; 
+  } 
+  
+  return p-buff;
+}
 void DL_recordToBuffer(void){
-	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){
+	DL_buffer_position=DL_buffer;
+/*	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){
 		Serial.print("no space in buffer ");
 		Serial.print(DL_buffer_position-DL_buffer,DEC);
 		Serial.print(" > ");
 		Serial.println(sizeof(DL_buffer)-70,DEC);
 		return;
-	}
+	}*/
 //	DL_buffer_position+=sprintf(DL_buffer_position,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
-	DL_buffer_position+=sprintf(DL_buffer_position,"%d",DL_counter);
+	DL_buffer_position+=sprintf(DL_buffer_position,"%04d",DL_time.year);
+	DL_buffer_position+=sprintf(DL_buffer_position,"-%02d",DL_time.mon);
+	DL_buffer_position+=sprintf(DL_buffer_position,"-%02d",DL_time.date);
+	DL_buffer_position+=sprintf(DL_buffer_position," %02d",DL_time.hour);
+	DL_buffer_position+=sprintf(DL_buffer_position,":%02d",DL_time.min);
+	DL_buffer_position+=sprintf(DL_buffer_position,":%02d",DL_time.sec);
+
+//	DL_buffer_position+=sprintf(DL_buffer_position,"%d",DL_counter);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
-		DL_buffer_position+=sprintf(DL_buffer_position,"\t%d.%d",TS_temperatureRaw[i]>>4,(TS_temperatureRaw[i]&0xF)*625);
+		*DL_buffer_position='\t';
+		DL_buffer_position++;
+		DL_buffer_position+=sprintFloat(DL_buffer_position,(float)TS_temperatureRaw[i]*0.0625,4);
 	}
+	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)getCurrent());
+	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)getCurrent()*100.0)%100);
+/*	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)raw_current);
+	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)raw_current*100.0)%100);
+*/	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)total_average);
+	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)total_average*100.0)%100);
 	DL_buffer_position+=sprintf(DL_buffer_position,"\r\n");
 }
 bool DL_writeToFile(const char *buff){
 	if(!SD_ready){
 		Serial.println("skip writing");
+		Serial.println(buff);
 		return false;
 	//	if(!(SD_ready=SD_init()))return;
 	}
@@ -137,9 +242,6 @@ bool DL_writeToFile(const char *buff){
 	return true;
 }
 ISR(TIMER2_COMPA_vect) {
-	Serial.print("mem=");
-	Serial.println(freeMemory());
-
 	DL_counter++;
 	DL_startPeriod();
 	if (TIMSK2 & 0b00000100 || TS_conversionOverflows > 0
@@ -223,10 +325,10 @@ void TS_init(void) {
 	TS.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
 	int initdelay = 2;
-	while (TS.getDeviceCount() == 0 && initdelay < 4000) {
-		if (initdelay < 8000) {
+	while (TS.getDeviceCount() == 0 && initdelay < 2000) {
+//		if (initdelay < 8000) {
 			initdelay <<= 1;
-		}
+//		}
 		// locate devices on the bus
 		TS_oneWire.reset();
 		TS.begin();

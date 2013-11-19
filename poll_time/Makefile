@@ -19,6 +19,8 @@ include ../lib.mk
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
 mega.elf: mega.o DS1302.o libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
 main.elf: main.o DS1302.o libMemoryFree.a libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
+# For normal printf
+# -Wl,-u,vfprintf -lprintf_flt
 # compile project:
 # make Blink.elf
 
