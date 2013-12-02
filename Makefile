@@ -78,5 +78,5 @@ monitor:
 ifeq ($(filter %-pc-cygwin,$(MAKE_HOST)),)
 	cu -l $(PORT) -s 115200	
 else
-	cu -l /dev/ttyACM0 -s 9600	
+	cu -l $(PORT) -s 115200
 endif

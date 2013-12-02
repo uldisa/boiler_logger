@@ -51,11 +51,13 @@ Time::Time()
 	this->dow  = 5;
 }
 
+#ifdef DS1302_EXTENDED
 DS1302_RAM::DS1302_RAM()
 {
 	for (int i=0; i<31; i++)
 		cell[i]=0;
 }
+#endif
 
 DS1302::DS1302(uint8_t ce_pin, uint8_t data_pin, uint8_t sclk_pin)
 {
@@ -81,6 +83,7 @@ Time DS1302::getTime()
 	return t;
 }
 
+#ifdef DS1302_EXTENDED
 void DS1302::setTime(uint8_t hour, uint8_t min, uint8_t sec)
 {
 	if (((hour>=0) && (hour<24)) && ((min>=0) && (min<60)) && ((sec>=0) && (sec<60)))
@@ -355,6 +358,7 @@ void DS1302::setTCR(uint8_t value)
 {
 	_writeRegister(REG_TCR, value);
 }
+#endif
 
 /* Private */
 
@@ -448,6 +452,7 @@ uint8_t	DS1302::_decodeY(uint8_t value)
 	return decoded;
 }
 
+#ifdef DS1302_EXTENDED
 uint8_t DS1302::_encode(uint8_t value)
 {
 	uint8_t encoded = ((value / 10) << 4) + (value % 10);
@@ -521,4 +526,4 @@ uint8_t DS1302::peek(uint8_t addr)
 	else
 		return 0;
 }
-
+#endif

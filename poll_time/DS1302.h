@@ -35,6 +35,9 @@
 	#include "WProgram.h"
 #endif
 
+//#define DS1302_EXTENDED 
+
+
 #define FORMAT_SHORT	1
 #define FORMAT_LONG	2
 
@@ -72,6 +75,7 @@ public:
 		Time();
 };
 
+#ifdef DS1302_EXTENDED
 class DS1302_RAM
 {
 public:
@@ -79,12 +83,13 @@ public:
 
 		DS1302_RAM();
 };
-
+#endif
 class DS1302
 {
 public:
 		DS1302(uint8_t ce_pin, uint8_t data_pin, uint8_t sclk_pin);
 	Time	getTime();
+#ifdef DS1302_EXTENDED
 	void	setTime(uint8_t hour, uint8_t min, uint8_t sec);
 	void	setDate(uint8_t date, uint8_t mon, uint16_t year);
 	void	setDOW(uint8_t dow);
@@ -102,6 +107,7 @@ public:
 	DS1302_RAM	readBuffer();
 	void		poke(uint8_t addr, uint8_t value);
 	uint8_t		peek(uint8_t addr);
+#endif
 
 //private:
 	uint8_t _ce_pin;
@@ -117,6 +123,8 @@ public:
 	uint8_t	_decode(uint8_t value);
 	uint8_t	_decodeH(uint8_t value);
 	uint8_t	_decodeY(uint8_t value);
+#ifdef DS1302_EXTENDED
 	uint8_t	_encode(uint8_t vaule);
+#endif
 };
 #endif

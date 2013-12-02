@@ -1,35 +1,56 @@
+//#define WEBSERVER 1
+//#define HALL 1
+#define DEBUG  1
 #include <avr/io.h>
 #include <avr/interrupt.h>
+//#ifdef DEBUG
 #include <MemoryFree.h>
+//#endif
+#define ONEWIRE_CRC 0
+#define ONEWIRE_CRC8_TABLE 0
 #include <OneWire.h>
+#define REQUIRESALARMS false
 #include <DallasTemperature.h>
 #include "DS1302.h"
 #include <SPI.h>
-#include <SD.h>
+#include <utility/SdFat.h>
+#include <utility/SdFatUtil.h>
+
+//#include <SD.h>
+/*#define UIP_CONF_MAX_CONNECTIONS 3
+#ifndef UIP_CONF_MAX_LISTENPORTS 1
+*/
+#ifdef WEBSERVER
 #include <UIPEthernet.h>
-
-
-#define DEBUG  1
+#if UIP_CONF_UDP
+#warning UIP UDP enabled. disable UDP in uipethernet-conf.h
+#endif
+#if UIP_ACTIVE_OPEN
+#warning UIP_ACTIVE_OPEN enabled. disable UIP_ACTIVE_OPEN in uipopt.h
+#endif
+#endif
 
 /* Naming:
  * TS - Temperature Sensor related code
  * DL - Data logging related code
  */
+#ifdef WEBSERVER
 EthernetServer server = EthernetServer(80);
+#endif
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-const int chipSelect = 9;    
+#define SD_CS 9    
 volatile bool SD_ready=false;
 SdFile SD_file;
 int SD_file_date=0; 
 
-char TS_precision = 12;
-unsigned int TS_conversionDelay = 0;
+#define TS_precision 12
+#define TS_conversionDelay 750 / (1 << (12 - TS_precision))
 volatile int16_t TS_temperatureRaw[8];	// We'll use this variable to store a found device address
 
-unsigned int DL_Timer1hz = 15625;	//Hz 16Mhz with 1024 prescale.
-unsigned int DL_period = 6000;	//Data Loggin (attempt) period in milliseconds
+#define DL_Timer1hz 15625	//Hz 16Mhz with 1024 prescale.
+#define DL_period  6000	//Data Loggin (attempt) period in milliseconds
 volatile unsigned int DL_periodOverflows = 0;
 volatile unsigned int TS_conversionOverflows = 0;
 volatile bool DL_timeInProgress=false;
@@ -61,7 +82,7 @@ void DL_startPeriod(void) {
 		TIMSK2 |= 0b00000010;
 	}
 }
-void TS_waitConversion(unsigned int conversionDelay) {
+void TS_waitConversion( int conversionDelay) {
 	//Calculate params for nested wakup
 	unsigned long conversionTicks = (unsigned long)DL_Timer1hz * conversionDelay / 1000 + TCNT2;	// Timer starts relative to current time.
 	OCR2B = conversionTicks & 0xFF;
@@ -75,6 +96,7 @@ void TS_waitConversion(unsigned int conversionDelay) {
 	}
 }
 
+#ifdef HALL
 #define HALLPIN A0
 int sensorValue=0;
 unsigned long readingEnd;
@@ -119,6 +141,23 @@ double getCurrent(void) {
 }
 // THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE.
 // Timer 2 makes sure that we take a reading every 2 miliseconds
+#endif
+size_t sprintfDec_padded(char *p,int i,int width){
+ int value=10; 
+ size_t len=0;
+ while(width>1) {
+	if(i<value) {
+		*p='0';
+		p++;
+ 		len++;
+	}
+	value*=10;
+	width--;	
+  }
+  itoa(i,p,10);
+  len += strlen(p);
+  return len;
+}
 size_t sprintFloat(char *buff,double number, uint8_t digits) 
 { 
   char *p=buff;
@@ -146,7 +185,8 @@ size_t sprintFloat(char *buff,double number, uint8_t digits)
   // Extract the integer part of the number and print it
   unsigned long int_part = (unsigned long)number;
   double remainder = number - (double)int_part;
-  p += sprintf(p,"%ld",int_part);
+  itoa(int_part,p,10);
+  p += strlen(p);
 
   // Print the decimal point, but only if there are digits beyond
   if (digits > 0) {
@@ -159,46 +199,59 @@ size_t sprintFloat(char *buff,double number, uint8_t digits)
   {
     remainder *= 10.0;
     int toPrint = int(remainder);
-    p += sprintf(p,"%d",toPrint);
+    *p=(uint8_t)'0'+toPrint;
+    p++;
     remainder -= toPrint; 
   } 
   
   return p-buff;
 }
+
 void DL_recordToBuffer(void){
 	DL_buffer_position=DL_buffer;
-/*	if((size_t)(DL_buffer_position-DL_buffer) > sizeof(DL_buffer)-70){
-		Serial.print("no space in buffer ");
-		Serial.print(DL_buffer_position-DL_buffer,DEC);
-		Serial.print(" > ");
-		Serial.println(sizeof(DL_buffer)-70,DEC);
-		return;
-	}*/
-//	DL_buffer_position+=sprintf(DL_buffer_position,"%04d-%02d-%02d\t%02d:%02d:%02d",DL_time.year,DL_time.mon,DL_time.date,DL_time.hour,DL_time.min,DL_time.sec);
-	DL_buffer_position+=sprintf(DL_buffer_position,"%04d",DL_time.year);
-	DL_buffer_position+=sprintf(DL_buffer_position,"-%02d",DL_time.mon);
-	DL_buffer_position+=sprintf(DL_buffer_position,"-%02d",DL_time.date);
-	DL_buffer_position+=sprintf(DL_buffer_position," %02d",DL_time.hour);
-	DL_buffer_position+=sprintf(DL_buffer_position,":%02d",DL_time.min);
-	DL_buffer_position+=sprintf(DL_buffer_position,":%02d",DL_time.sec);
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.year,4);
+	*(DL_buffer_position++)='-';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.mon,2);
+	*(DL_buffer_position++)='-';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.date,2);
+	*(DL_buffer_position++)=' ';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.hour,2);
+	*(DL_buffer_position++)=':';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.min,2);
+	*(DL_buffer_position++)=':';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,DL_time.sec,2);
 
-//	DL_buffer_position+=sprintf(DL_buffer_position,"%d",DL_counter);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
-		*DL_buffer_position='\t';
-		DL_buffer_position++;
+		*(DL_buffer_position++)='\t';
+		//dtostrf((float)TS_temperatureRaw[i]*0.0625,10,4,DL_buffer_position);
+		//DL_buffer_position+=strlen(DL_buffer_position);*/
 		DL_buffer_position+=sprintFloat(DL_buffer_position,(float)TS_temperatureRaw[i]*0.0625,4);
 	}
-	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)getCurrent());
-	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)getCurrent()*100.0)%100);
-/*	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)raw_current);
-	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)raw_current*100.0)%100);
-*/	DL_buffer_position+=sprintf(DL_buffer_position,"\t%d",(int)total_average);
-	DL_buffer_position+=sprintf(DL_buffer_position,".%d",(unsigned int)((double)total_average*100.0)%100);
-	DL_buffer_position+=sprintf(DL_buffer_position,"\r\n");
+#ifdef HALL
+	getCurrent();
+	*(DL_buffer_position++)='\t';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,(int)raw_current,0);
+	*(DL_buffer_position++)='.';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,(unsigned int)((double)raw_current*100.0)%100,0);
+	*(DL_buffer_position++)='\t';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,(int)total_average,0);
+	*(DL_buffer_position++)='.';
+	DL_buffer_position+=sprintfDec_padded(DL_buffer_position,(unsigned int)((double)total_average*100.0)%100,0);
+#endif
+	*(DL_buffer_position++)='\r';
+	*(DL_buffer_position++)='\n';
+
+}
+void print_error(int line,int code1,int code2) {
+	Serial.print("E "); Serial.print(line,DEC);
+	Serial.print(" "); Serial.print(code1,HEX);
+	Serial.print(" "); Serial.println(code2,HEX);
 }
 bool DL_writeToFile(const char *buff){
 	if(!SD_ready){
+#ifdef DEBUG
 		Serial.println("skip writing");
+#endif
 		Serial.println(buff);
 		return false;
 	//	if(!(SD_ready=SD_init()))return;
@@ -210,34 +263,36 @@ bool DL_writeToFile(const char *buff){
 		SD_file_date=DL_time.date;
 	}	
 	if(!SD_file.isOpen()) {
-		char buff[13];
-		//Generate file name
+		char buff[13]={"default.log"};
 		//sprintf(buff,"%04d%02d%02d.log",DL_time.year,DL_time.mon,DL_time.date);
-		sprintf(buff,"default.log");
+#ifdef DEBUG
 		Serial.print("Opening file ");
 		Serial.println(buff);
-		if(!SD_file.open(root,buff,O_CREAT|O_WRITE|O_APPEND)) {
-			Serial.print("Opening file failed");
-			Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-			Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+#endif
+		if(!SD_file.open(&root,(const char *)buff,(uint8_t)O_CREAT|O_WRITE|O_APPEND)) {
+#ifdef DEBUG
+			print_error(__LINE__, card.errorCode(), card.errorData());
+#endif
 			SD_ready=false;
 			return false;
 		}
 	}
 	if(!SD_file.write(buff)) {
-		Serial.print("Writing file failed");
-		Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-		Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+#ifdef DEBUG
+		print_error(__LINE__, card.errorCode(), card.errorData());
+#endif
 		SD_ready=false;
 		return false;
 	}
 	if(millis()-last_sync > SYNC){
 		last_sync=millis();
+#ifdef DEBUG
 		Serial.println("Syncin");
+#endif
 		if(!SD_file.sync()) {
-			Serial.print("Syncing file failed");
-			Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-			Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+#ifdef DEBUG
+			Serial.print(" "); Serial.println(card.errorData(),HEX);
+#endif
 			//SD_ready=false;
 			//return false;
 		}
@@ -307,28 +362,30 @@ ISR(TIMER2_OVF_vect) {
 			TIMSK2 |= 0b00000100;
 		}
 	}
-	PORTD ^= 0b10000000;
+	//PORTD ^= 0b10000000;
+	digitalWrite(7,!digitalRead(7));
 
 }
 
 // function to print a device address
 #ifdef DEBUG
-void printAddress(DeviceAddress deviceAddress) {
+/*void printAddress(DeviceAddress deviceAddress) {
 	for (uint8_t i = 0; i < 8; i++) {
 		if (deviceAddress[i] < 16)
 			Serial.print("0");
 		Serial.print(deviceAddress[i], HEX);
 	}
-}
+}*/
 #endif
 void TS_init(void) {
 
-	TS_conversionDelay = 750 / (1 << (12 - TS_precision));	// Calculate temperature conversion time
+	//TS_conversionDelay = 750 / (1 << (12 - TS_precision));	// Calculate temperature conversion time
 	//DallasTemperature wrapper from OneWire reset_search. 
+	TS_oneWire.reset();
 	TS.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
-	int initdelay = 2;
-	while (TS.getDeviceCount() == 0 && initdelay < 2000) {
+//	int initdelay = 2;
+/*	while (TS.getDeviceCount() == 0 && initdelay < 2000) {
 //		if (initdelay < 8000) {
 			initdelay <<= 1;
 //		}
@@ -336,8 +393,6 @@ void TS_init(void) {
 		TS_oneWire.reset();
 		TS.begin();
 #ifdef DEBUG
-		Serial.print("Locating devices...");
-		Serial.print("Found ");
 		Serial.print(TS.getDeviceCount(), DEC);
 		Serial.println(" devices.");
 #endif
@@ -345,9 +400,10 @@ void TS_init(void) {
 			delay(initdelay);
 		}
 
-	}
+	}*/
 	// Loop through each device, print out address
 	TS.setWaitForConversion(true);
+	Serial.println(TS.getDeviceCount(), DEC);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		TS_temperatureRaw[i]=DEVICE_DISCONNECTED_RAW;
 	// Search the wire for address
@@ -355,8 +411,8 @@ void TS_init(void) {
 #ifdef DEBUG
 			Serial.print("Found device ");
 			Serial.print(i, DEC);
-			Serial.print(" with address: ");
-			printAddress(TS_DA[i]);
+//			Serial.print(" with address: ");
+//			printAddress(TS_DA[i]);
 			Serial.println();
 
 			// set the resolution to TS_precision bit (Each Dallas/Maxim device is capable of several different resolutions)
@@ -367,9 +423,7 @@ void TS_init(void) {
 
 		} else {
 #ifdef DEBUG
-			Serial.print("Found ghost device at ");
-			Serial.print(i, DEC);
-			Serial.print (" but could not detect address. Check power and cabling");
+			print_error(__LINE__, i,0);
 #endif
 		}
 	}
@@ -385,107 +439,58 @@ bool SD_init(void)
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
  // if (!card.init(SPI_HALF_SPEED, chipSelect)) {
-  if (!card.init(SPI_FULL_SPEED, chipSelect)) {
+  pinMode(9, OUTPUT);     // change this to 53 on a mega
+  digitalWrite(9, HIGH);     // change this to 53 on a mega
+  if (!card.init(SPI_FULL_SPEED, SD_CS)) {
 #ifdef DEBUG
-    Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-    Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
-/*    Serial.println("initialization failed. Things to check:");
-    Serial.println("* is a card is inserted?");
-    Serial.println("* Is your wiring correct?");
-    Serial.println("* did you change the chipSelect pin to match your shield or module?");*/
+	print_error(__LINE__, card.errorCode(), card.errorData());
 #endif
     return false;
   } else {
-#ifdef DEBUG
-   Serial.println("Wiring is correct and a card is present."); 
-#endif
   }
-#ifdef DEBUG
-  // print the type of card
-/*  Serial.print("\nCard type: ");
-  switch(card.type()) {
-    case SD_CARD_TYPE_SD1:
-      Serial.println("SD1");
-      break;
-    case SD_CARD_TYPE_SD2:
-      Serial.println("SD2");
-      break;
-    case SD_CARD_TYPE_SDHC:
-      Serial.println("SDHC");
-      break;
-    default:
-      Serial.println("Unknown");
-  }*/
-#endif
   // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
-  if (!volume.init(card)) {
+  if (!volume.init(&card)) {
 #ifdef DEBUG
-    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
-    Serial.print("errorCode="); Serial.print(card.errorCode(),HEX);
-    Serial.print(" errorData="); Serial.println(card.errorData(),HEX);
+	print_error(__LINE__, card.errorCode(), card.errorData());
 #endif
     return false;
   }
 
-#ifdef DEBUG
-  // print the type and size of the first FAT-type volume
-/*  uint32_t volumesize;
-  Serial.print("\nVolume type is FAT");
-  Serial.println(volume.fatType(), DEC);
-  Serial.println();
+  root.openRoot(&volume);
   
-  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-  volumesize *= 512;                            // SD card blocks are always 512 bytes
-  Serial.print("Volume size (bytes): ");
-  Serial.println(volumesize);
-  Serial.print("Volume size (Kbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
-  Serial.print("Volume size (Mbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
-
-  
-  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-*/  
-#endif
-  root.openRoot(volume);
-  
-#ifdef DEBUG
+/*#ifdef DEBUG
   // list all files in the card with date and size
   root.ls(LS_R | LS_DATE | LS_SIZE);
-#endif
+#endif*/
   
   return true;
 }
 void setup() {
-	cli();
-	PORTD ^= ~0b1000000;		//Pull down PORTD pins
-	PORTB ^= ~0b0000011;		//Pull down PORTB pins
-	DDRD |= 0b10000000;	//Enable output for led pin 7
-	DDRB |= 0b00000011;	//Enable output for led pins 8, 9
-	pinMode(9, OUTPUT);     // change this to 53 on a mega
-#ifdef DEBUG
+	//PORTD ^= ~0b1000000;		//Pull down PORTD pins
+	//PORTB ^= ~0b0000011;		//Pull down PORTB pins
+	//DDRD |= 0b10000000;	//Enable output for led pin 7
+	//DDRB |= 0b00000011;	//Enable output for led pins 8, 9
+	pinMode(7, OUTPUT); 
+	digitalWrite(7, HIGH); 
 	Serial.begin(115200);
-#endif
+#ifdef DEBUG
 	Serial.print("0 mem=");
-	Serial.println(freeMemory());
+	Serial.println(freeMemory(),DEC);
+#endif
 	DL_buffer_position=DL_buffer;
 
-	DL_time=rtc.getTime();
+//	DL_time=rtc.getTime();
 	DL_time=rtc.getTime();
 	TS_init();		//Initialize temperature sensors
 	SD_ready=SD_init();
-/*	rtc.setDOW(SUNDAY);        // Set Day-of-Week to FRIDAY
-	rtc.setTime(3, 25, 0);     // Set the time to 12:00:00 (24hr format)
-	rtc.setDate(3, 11, 2013);   // Set the date to August 6th, 2010
-*/
 	DL_recordToBuffer();
-	if(DL_writeToFile(DL_buffer)){
+	Serial.print(DL_buffer);
+/*	if(DL_writeToFile(DL_buffer)){
 		Serial.print(DL_buffer);
 		DL_buffer_position=DL_buffer;
 	}
+*/
+	cli();
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
@@ -495,14 +500,16 @@ void setup() {
 	// (10 on most Arduino boards, 53 on the Mega) must be left as an output 
 	// or the SD library functions will not work. 
 
+#ifdef WEBSERVER
   uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
-  IPAddress myIP(192,168,1,159);
+/*  IPAddress myIP(192,168,1,159);
   IPAddress myIP2(192,168,1,160);
   IPAddress myIP3(192,168,1,160);
   IPAddress myIP4(255,255,255,0);
+*/
+  Ethernet.begin(mac,IPAddress(192,168,1,159),IPAddress(192,168,1,160),IPAddress(192,168,1,160),IPAddress(255,255,255,0));
 
-  Ethernet.begin(mac,myIP,myIP2,myIP3,myIP4);
-
+#ifdef DEBUG
   Serial.print("localIP: ");
   Serial.println(Ethernet.localIP());
   Serial.print("subnetMask: ");
@@ -511,16 +518,18 @@ void setup() {
   Serial.println(Ethernet.gatewayIP());
   Serial.print("dnsServerIP: ");
   Serial.println(Ethernet.dnsServerIP());
+#endif
 
   server.begin();
+#endif
 
 	sei();			//Enable interrupts
 	DL_startPeriod();	//Start data logging interval hartbeat
 #ifdef DEBUG
 	Serial.println("init done");
-#endif
 	Serial.print("1 mem=");
-	Serial.println(freeMemory());
+	Serial.println(freeMemory(),DEC);
+#endif
 }
 
 /*char second = 0;
@@ -528,25 +537,27 @@ char old_second = 0;
 unsigned long ticks = 0;
 */
 void loop() {
-	int size;
 	if(!SD_ready) {
 		SD_ready=SD_init();
 	}
-  if (EthernetClient client = server.available())
-    {
-      while((size = client.available()) > 0)
-        {
-          size = client.read(nulldata,16);
-         Serial.print("size ");
-         Serial.println(size,DEC);
-	  if (size <0) {
-          	Serial.println("!!!!!! error");
-	  }
-        }
-      client.println("<H1>DATA from Server!");
-      client.println(DL_buffer);
-      client.println("</H1>");
-      client.stop();
-    }
+#ifdef WEBSERVER
+	int size;
+	  if (EthernetClient client = server.available())
+	    {
+	      while((size = client.available()) > 0)
+		{
+		  size = client.read(nulldata,16);
+		 Serial.print("size ");
+		 Serial.println(size,DEC);
+		  if (size <0) {
+			Serial.println("!!!!!! error");
+		  }
+		}
+	      client.println("<H1>DATA from Server!");
+	      client.println(DL_buffer);
+	      client.println("</H1>");
+	      client.stop();
+	    }
+#endif
 	delay(1000);
 }

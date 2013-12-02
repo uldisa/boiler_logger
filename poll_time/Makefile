@@ -8,8 +8,8 @@ LIBS=core MemoryFree OneWire DallasTemperature SD SPI UIPEthernet
 #CPPFLAGS+=-DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR
 #VARIANT=mega
 #PROGRAMMER=wiring
-#PORT=/dev/ttyUSB0
-PORT=COM9
+PORT=/dev/ttyUSB0
+#PORT=COM9
 CPU=atmega328p
 BR=57600
 CPPFLAGS+=-DARDUINO_AVR_PRO -DARDUINO_ARCH_AVR
@@ -37,3 +37,5 @@ AnalogReadSerial.elf:libcore.a
 DS1302_Serial_Easy.elf:DS1302.o libcore.a
 
 CardInfo.elf: libcore.a libSD.a libSPI.a
+
+strings.elf: libcore.a 
