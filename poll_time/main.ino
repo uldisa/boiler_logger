@@ -1,13 +1,11 @@
-//#define WEBSERVER 1
-//#define HALL 1
+#define WEBSERVER 1
+#define HALL 1
 #define DEBUG  1
 #include <avr/io.h>
 #include <avr/interrupt.h>
-//#ifdef DEBUG
+#ifdef DEBUG
 #include <MemoryFree.h>
-//#endif
-#define ONEWIRE_CRC 0
-#define ONEWIRE_CRC8_TABLE 0
+#endif
 #include <OneWire.h>
 #define REQUIRESALARMS false
 #include <DallasTemperature.h>
@@ -15,19 +13,8 @@
 #include <SPI.h>
 #include <utility/SdFat.h>
 #include <utility/SdFatUtil.h>
-
-//#include <SD.h>
-/*#define UIP_CONF_MAX_CONNECTIONS 3
-#ifndef UIP_CONF_MAX_LISTENPORTS 1
-*/
 #ifdef WEBSERVER
 #include <UIPEthernet.h>
-#if UIP_CONF_UDP
-#warning UIP UDP enabled. disable UDP in uipethernet-conf.h
-#endif
-#if UIP_ACTIVE_OPEN
-#warning UIP_ACTIVE_OPEN enabled. disable UIP_ACTIVE_OPEN in uipopt.h
-#endif
 #endif
 
 /* Naming:
@@ -40,7 +27,7 @@ EthernetServer server = EthernetServer(80);
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-#define SD_CS 9    
+#define SD_CS 48    
 volatile bool SD_ready=false;
 SdFile SD_file;
 int SD_file_date=0; 
@@ -58,9 +45,9 @@ Time DL_time;
 unsigned long last_millis = 0;
 volatile bool TS_readingInProgress = false;
 bool SD_init(void);
-DS1302 rtc(2 /*reset*/, 3/*IO*/, 4/*SCLK*/);
+DS1302 rtc(42 /*reset*/, 44/*IO*/, 46/*SCLK*/);
 volatile unsigned long DL_counter = 0;
-OneWire TS_oneWire(6);
+OneWire TS_oneWire(40);
 DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
@@ -71,7 +58,7 @@ volatile unsigned long last_sync=0;
 
 void DL_startPeriod(void) {
 	//Calculate params for next wakup
-	unsigned long periodTicks = (unsigned long)DL_Timer1hz * DL_period / 1024 + OCR2A;	//Equal time intervals
+	unsigned long periodTicks = (unsigned long)DL_Timer1hz * (unsigned int)DL_period / 1024 + OCR2A;	//Equal time intervals
 	OCR2A = periodTicks & 0xFF;
 	DL_periodOverflows = periodTicks >> 8;
 	if (DL_periodOverflows > 0) {
@@ -312,6 +299,7 @@ ISR(TIMER2_COMPA_vect) {
 	DL_timeInProgress=true;
 	DL_time=rtc.getTime();
 	DL_timeInProgress=false;
+	digitalWrite(13,HIGH);
 	TS.requestTemperatures();	// Send the command to get temperatures
 	TS_waitConversion(TS_conversionDelay);
 	DL_recordToBuffer(); // Put time record in memory buffer
@@ -323,6 +311,7 @@ ISR(TIMER2_COMPA_vect) {
 	}
 }
 ISR(TIMER2_COMPB_vect) {
+	digitalWrite(13,LOW);
 	TS_readingInProgress = true;
 //	PORTB ^= 0b00000001;
 	TIMSK2 &= ~0b00000100;	//Do it once
@@ -363,7 +352,7 @@ ISR(TIMER2_OVF_vect) {
 		}
 	}
 	//PORTD ^= 0b10000000;
-	digitalWrite(7,!digitalRead(7));
+	digitalWrite(38,!digitalRead(38));
 
 }
 
@@ -439,8 +428,6 @@ bool SD_init(void)
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
  // if (!card.init(SPI_HALF_SPEED, chipSelect)) {
-  pinMode(9, OUTPUT);     // change this to 53 on a mega
-  digitalWrite(9, HIGH);     // change this to 53 on a mega
   if (!card.init(SPI_FULL_SPEED, SD_CS)) {
 #ifdef DEBUG
 	print_error(__LINE__, card.errorCode(), card.errorData());
@@ -470,8 +457,17 @@ void setup() {
 	//PORTB ^= ~0b0000011;		//Pull down PORTB pins
 	//DDRD |= 0b10000000;	//Enable output for led pin 7
 	//DDRB |= 0b00000011;	//Enable output for led pins 8, 9
-	pinMode(7, OUTPUT); 
-	digitalWrite(7, HIGH); 
+	cli();
+	TCCR2A = 0b00000000;	//Normal Timer2 mode.
+	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
+	TIMSK2 = 0b00000001;	//Enable overflow interrupt
+  	pinMode(13, OUTPUT);     // change this to 53 on a mega
+	digitalWrite(13,LOW);
+  	pinMode(53, OUTPUT);     // change this to 53 on a mega
+  	pinMode(SD_CS, OUTPUT);     // change this to 53 on a mega
+	pinMode(38, OUTPUT); 
+	digitalWrite(38, HIGH); 
+	sei();			//Enable interrupts
 	Serial.begin(115200);
 #ifdef DEBUG
 	Serial.print("0 mem=");
@@ -490,10 +486,6 @@ void setup() {
 		DL_buffer_position=DL_buffer;
 	}
 */
-	cli();
-	TCCR2A = 0b00000000;	//Normal Timer2 mode.
-	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
-	TIMSK2 = 0b00000001;	//Enable overflow interrupt
 
 	// On the Ethernet Shield, CS is pin 4. It's set as an output by default.
 	// Note that even if it's not used as the CS pin, the hardware SS pin 
@@ -502,12 +494,12 @@ void setup() {
 
 #ifdef WEBSERVER
   uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
-/*  IPAddress myIP(192,168,1,159);
+  IPAddress myIP(192,168,1,159);
   IPAddress myIP2(192,168,1,160);
   IPAddress myIP3(192,168,1,160);
   IPAddress myIP4(255,255,255,0);
-*/
-  Ethernet.begin(mac,IPAddress(192,168,1,159),IPAddress(192,168,1,160),IPAddress(192,168,1,160),IPAddress(255,255,255,0));
+
+  Ethernet.begin(mac,myIP);
 
 #ifdef DEBUG
   Serial.print("localIP: ");
@@ -523,7 +515,6 @@ void setup() {
   server.begin();
 #endif
 
-	sei();			//Enable interrupts
 	DL_startPeriod();	//Start data logging interval hartbeat
 #ifdef DEBUG
 	Serial.println("init done");
@@ -550,7 +541,7 @@ void loop() {
 		 Serial.print("size ");
 		 Serial.println(size,DEC);
 		  if (size <0) {
-			Serial.println("!!!!!! error");
+			Serial.println("error");
 		  }
 		}
 	      client.println("<H1>DATA from Server!");
