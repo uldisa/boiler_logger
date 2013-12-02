@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core MemoryFree OneWire DallasTemperature SD SPI
+LIBS=core MemoryFree OneWire DallasTemperature SD SPI UIPEthernet
 #PORT=/dev/ttyACM1
 #PORT=COM11
 #CPU=atmega2560
@@ -18,7 +18,7 @@ PROGRAMMER=arduino
 include ../lib.mk
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
 mega.elf: mega.o DS1302.o libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
-main.elf: main.o DS1302.o libMemoryFree.a libDallasTemperature.a libOneWire.a libSD.a libSPI.a libcore.a
+main.elf: main.o DS1302.o libMemoryFree.a libDallasTemperature.a libOneWire.a libSD.a libUIPEthernet.a libSPI.a libcore.a
 # For normal printf
 # -Wl,-u,vfprintf -lprintf_flt
 # compile project:

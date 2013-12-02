@@ -10,7 +10,7 @@ uint8_t digit[16] PROGMEM = {
 	0b10111110,
 	0b11100000,
 	0b11111110,
-	0b11110100,
+	0b11110110,
 	0b11101110,
 	0b01111010,
 	0b10011100,
@@ -22,8 +22,9 @@ void send_bit(bool bit){
 	digitalWrite(9,HIGH);
 //	delay(1);
 	digitalWrite(8,(bit?LOW:HIGH));
-	digitalWrite(9,LOW);
 //	delay(1);
+	digitalWrite(9,LOW);
+//	delay(2);
 }
 void send_byte(uint8_t byte){
 	int i;
@@ -44,8 +45,9 @@ void setup()
 char d=0;
 void loop()
 {
-	send_byte(pgm_read_byte_near(digit+(d&0xf)));
-	delay(100);
+	send_byte(pgm_read_byte_near(digit+(d)));
+	delay(500);
 	d++;
+	if(d>9){d=0;}
 }
 

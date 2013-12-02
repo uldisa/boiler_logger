@@ -6,6 +6,7 @@
 #include "DS1302.h"
 #include <SPI.h>
 #include <SD.h>
+#include <UIPEthernet.h>
 
 
 #define DEBUG  1
@@ -14,10 +15,11 @@
  * TS - Temperature Sensor related code
  * DL - Data logging related code
  */
+EthernetServer server = EthernetServer(80);
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-const int chipSelect = 10;    
+const int chipSelect = 9;    
 volatile bool SD_ready=false;
 SdFile SD_file;
 int SD_file_date=0; 
@@ -27,7 +29,7 @@ unsigned int TS_conversionDelay = 0;
 volatile int16_t TS_temperatureRaw[8];	// We'll use this variable to store a found device address
 
 unsigned int DL_Timer1hz = 15625;	//Hz 16Mhz with 1024 prescale.
-unsigned int DL_period = 60000;	//Data Loggin (attempt) period in milliseconds
+unsigned int DL_period = 6000;	//Data Loggin (attempt) period in milliseconds
 volatile unsigned int DL_periodOverflows = 0;
 volatile unsigned int TS_conversionOverflows = 0;
 volatile bool DL_timeInProgress=false;
@@ -35,13 +37,14 @@ Time DL_time;
 unsigned long last_millis = 0;
 volatile bool TS_readingInProgress = false;
 bool SD_init(void);
-DS1302 rtc(2, 3, 4);
+DS1302 rtc(2 /*reset*/, 3/*IO*/, 4/*SCLK*/);
 volatile unsigned long DL_counter = 0;
 OneWire TS_oneWire(6);
 DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
 char DL_buffer[100];
+uint8_t nulldata[17];
 #define SYNC 10000
 volatile unsigned long last_sync=0;
 
@@ -249,7 +252,7 @@ ISR(TIMER2_COMPA_vect) {
 		// If Nested timer not done, skip the beat.
 		return;
 	}
-	PORTB ^= 0b00000010;
+//	PORTB ^= 0b00000010;
 	// Get current date
 	DL_timeInProgress=true;
 	DL_time=rtc.getTime();
@@ -266,7 +269,7 @@ ISR(TIMER2_COMPA_vect) {
 }
 ISR(TIMER2_COMPB_vect) {
 	TS_readingInProgress = true;
-	PORTB ^= 0b00000001;
+//	PORTB ^= 0b00000001;
 	TIMSK2 &= ~0b00000100;	//Do it once
 	// Loop through each device, print out temperature data
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
@@ -462,7 +465,7 @@ void setup() {
 	PORTB ^= ~0b0000011;		//Pull down PORTB pins
 	DDRD |= 0b10000000;	//Enable output for led pin 7
 	DDRB |= 0b00000011;	//Enable output for led pins 8, 9
-	pinMode(10, OUTPUT);     // change this to 53 on a mega
+	pinMode(9, OUTPUT);     // change this to 53 on a mega
 #ifdef DEBUG
 	Serial.begin(115200);
 #endif
@@ -492,6 +495,25 @@ void setup() {
 	// (10 on most Arduino boards, 53 on the Mega) must be left as an output 
 	// or the SD library functions will not work. 
 
+  uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
+  IPAddress myIP(192,168,1,159);
+  IPAddress myIP2(192,168,1,160);
+  IPAddress myIP3(192,168,1,160);
+  IPAddress myIP4(255,255,255,0);
+
+  Ethernet.begin(mac,myIP,myIP2,myIP3,myIP4);
+
+  Serial.print("localIP: ");
+  Serial.println(Ethernet.localIP());
+  Serial.print("subnetMask: ");
+  Serial.println(Ethernet.subnetMask());
+  Serial.print("gatewayIP: ");
+  Serial.println(Ethernet.gatewayIP());
+  Serial.print("dnsServerIP: ");
+  Serial.println(Ethernet.dnsServerIP());
+
+  server.begin();
+
 	sei();			//Enable interrupts
 	DL_startPeriod();	//Start data logging interval hartbeat
 #ifdef DEBUG
@@ -506,8 +528,25 @@ char old_second = 0;
 unsigned long ticks = 0;
 */
 void loop() {
+	int size;
 	if(!SD_ready) {
 		SD_ready=SD_init();
 	}
+  if (EthernetClient client = server.available())
+    {
+      while((size = client.available()) > 0)
+        {
+          size = client.read(nulldata,16);
+         Serial.print("size ");
+         Serial.println(size,DEC);
+	  if (size <0) {
+          	Serial.println("!!!!!! error");
+	  }
+        }
+      client.println("<H1>DATA from Server!");
+      client.println(DL_buffer);
+      client.println("</H1>");
+      client.stop();
+    }
 	delay(1000);
 }
