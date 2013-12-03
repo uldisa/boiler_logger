@@ -1,8 +1,8 @@
 include ../Makefile
 
 LIBS=core MemoryFree OneWire DallasTemperature SD SPI UIPEthernet
-#PORT=/dev/ttyACM1
-PORT=COM11
+PORT=/dev/ttyACM0
+#PORT=COM11
 CPU=atmega2560
 BR=115200
 CPPFLAGS+=-DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR

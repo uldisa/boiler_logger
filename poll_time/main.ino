@@ -1,5 +1,7 @@
+#define ENC28J60DEBUG 1
+#define SDCARD 1
 #define WEBSERVER 1
-#define HALL 1
+//#define HALL 1
 #define DEBUG  1
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -21,23 +23,27 @@
  * TS - Temperature Sensor related code
  * DL - Data logging related code
  */
+#define ETHERNET_CS ENC28J60_CONTROL_CS  
+#define SD_CS 48    
 #ifdef WEBSERVER
 EthernetServer server = EthernetServer(80);
 #endif
+#ifdef SDCARD
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-#define SD_CS 48    
 volatile bool SD_ready=false;
+unsigned long SD_init_wait;
 SdFile SD_file;
 int SD_file_date=0; 
+#endif
 
 #define TS_precision 12
 #define TS_conversionDelay 750 / (1 << (12 - TS_precision))
 volatile int16_t TS_temperatureRaw[8];	// We'll use this variable to store a found device address
 
 #define DL_Timer1hz 15625	//Hz 16Mhz with 1024 prescale.
-#define DL_period  6000	//Data Loggin (attempt) period in milliseconds
+#define DL_period  2000	//Data Loggin (attempt) period in milliseconds
 volatile unsigned int DL_periodOverflows = 0;
 volatile unsigned int TS_conversionOverflows = 0;
 volatile bool DL_timeInProgress=false;
@@ -52,9 +58,10 @@ DallasTemperature TS(&TS_oneWire);
 DeviceAddress TS_DA[8];		// We'll use this variable to store a found device address
 char *DL_buffer_position=0;
 char DL_buffer[100];
-uint8_t nulldata[17];
-#define SYNC 10000
+char request_data[100];
+#define SYNC 4000
 volatile unsigned long last_sync=0;
+volatile char DL_data_to_write=false;
 
 void DL_startPeriod(void) {
 	//Calculate params for next wakup
@@ -234,16 +241,17 @@ void print_error(int line,int code1,int code2) {
 	Serial.print(" "); Serial.print(code1,HEX);
 	Serial.print(" "); Serial.println(code2,HEX);
 }
+#ifdef SDCARD
 bool DL_writeToFile(const char *buff){
-	if(!SD_ready){
+/*	if(!SD_ready){
 #ifdef DEBUG
 		Serial.println("skip writing");
 #endif
-		Serial.println(buff);
+//		Serial.println(buff);
 		return false;
 	//	if(!(SD_ready=SD_init()))return;
 	}
-	//close file, if file name has changed.	
+*/	//close file, if file name has changed.	
 	// filename based on date
 	if(SD_file_date!=DL_time.date) {
 		SD_file.close();
@@ -286,6 +294,7 @@ bool DL_writeToFile(const char *buff){
 	}	
 	return true;
 }
+#endif
 ISR(TIMER2_COMPA_vect) {
 	DL_counter++;
 	DL_startPeriod();
@@ -294,7 +303,6 @@ ISR(TIMER2_COMPA_vect) {
 		// If Nested timer not done, skip the beat.
 		return;
 	}
-//	PORTB ^= 0b00000010;
 	// Get current date
 	DL_timeInProgress=true;
 	DL_time=rtc.getTime();
@@ -303,34 +311,24 @@ ISR(TIMER2_COMPA_vect) {
 	TS.requestTemperatures();	// Send the command to get temperatures
 	TS_waitConversion(TS_conversionDelay);
 	DL_recordToBuffer(); // Put time record in memory buffer
-	if(DL_writeToFile(DL_buffer)){
-		Serial.print(DL_buffer);
-		DL_buffer_position=DL_buffer;
-	} else {
+	DL_data_to_write=true;
+/*#ifdef SDCARD
+	if(!DL_writeToFile(DL_buffer)){
 		Serial.println("Wait for card");
 	}
+#endif*/
+	Serial.print(DL_buffer);
+	DL_buffer_position=DL_buffer;
 }
 ISR(TIMER2_COMPB_vect) {
 	digitalWrite(13,LOW);
 	TS_readingInProgress = true;
-//	PORTB ^= 0b00000001;
 	TIMSK2 &= ~0b00000100;	//Do it once
 	// Loop through each device, print out temperature data
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
 		TS_temperatureRaw[i] = TS.getTemp(TS_DA[i]);
 	}
 	TS_readingInProgress = false;
-/*#ifdef DEBUG
-	for (int i = 0; i < TS.getDeviceCount(); i++) {
-		Serial.print("T");
-		Serial.print(i, DEC);
-		Serial.print("=");
-		Serial.print(TS.rawToCelsius(TS_temperatureRaw[i]));
-		Serial.print(" ");
-		//else ghost device! Check your power requirements and cabling
-	}
-	Serial.println(" ");
-#endif*/
 }
 ISR(TIMER2_OVF_vect) {
 	if (DL_periodOverflows) {
@@ -368,29 +366,9 @@ ISR(TIMER2_OVF_vect) {
 #endif
 void TS_init(void) {
 
-	//TS_conversionDelay = 750 / (1 << (12 - TS_precision));	// Calculate temperature conversion time
-	//DallasTemperature wrapper from OneWire reset_search. 
 	TS_oneWire.reset();
 	TS.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
-//	int initdelay = 2;
-/*	while (TS.getDeviceCount() == 0 && initdelay < 2000) {
-//		if (initdelay < 8000) {
-			initdelay <<= 1;
-//		}
-		// locate devices on the bus
-		TS_oneWire.reset();
-		TS.begin();
-#ifdef DEBUG
-		Serial.print(TS.getDeviceCount(), DEC);
-		Serial.println(" devices.");
-#endif
-		if (TS.getDeviceCount() == 0) {
-			delay(initdelay);
-		}
-
-	}*/
-	// Loop through each device, print out address
 	TS.setWaitForConversion(true);
 	Serial.println(TS.getDeviceCount(), DEC);
 	for (int i = 0; i < TS.getDeviceCount(); i++) {
@@ -419,8 +397,13 @@ void TS_init(void) {
 	TS.setWaitForConversion(false);
 }
 
+#ifdef SDCARD
 bool SD_init(void)
 {
+  if(SD_init_wait>millis()){
+	return SD_ready;
+  }
+  SD_init_wait=millis()+1000;
   SD_file.close(); //drop open flag
 #ifdef DEBUG
   Serial.print("\nInitializing SD card...");
@@ -428,7 +411,7 @@ bool SD_init(void)
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
  // if (!card.init(SPI_HALF_SPEED, chipSelect)) {
-  if (!card.init(SPI_FULL_SPEED, SD_CS)) {
+  if (!card.init(SPI_HALF_SPEED, SD_CS)) {
 #ifdef DEBUG
 	print_error(__LINE__, card.errorCode(), card.errorData());
 #endif
@@ -452,6 +435,7 @@ bool SD_init(void)
   
   return true;
 }
+#endif
 void setup() {
 	//PORTD ^= ~0b1000000;		//Pull down PORTD pins
 	//PORTB ^= ~0b0000011;		//Pull down PORTB pins
@@ -461,14 +445,28 @@ void setup() {
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
+  	pinMode(38, OUTPUT);     // change this to 53 on a mega
+	digitalWrite(38,LOW);
   	pinMode(13, OUTPUT);     // change this to 53 on a mega
 	digitalWrite(13,LOW);
-  	pinMode(53, OUTPUT);     // change this to 53 on a mega
-  	pinMode(SD_CS, OUTPUT);     // change this to 53 on a mega
-	pinMode(38, OUTPUT); 
-	digitalWrite(38, HIGH); 
+  	pinMode(ETHERNET_CS, OUTPUT);     // change this to 53 on a mega
+ 	pinMode(SD_CS, OUTPUT);     // change this to 53 on a mega
+
+  	pinMode(36, OUTPUT);     // enc28j60 reset
+//  	pinMode(36, LOW);
+	digitalWrite(ETHERNET_CS, HIGH); 
+	digitalWrite(SD_CS, HIGH); 
 	sei();			//Enable interrupts
 	Serial.begin(115200);
+#ifdef WEBSERVER
+	Serial.print("reset ethernet");
+	digitalWrite(ETHERNET_CS, LOW); 
+	digitalWrite(36,LOW);
+	delay(50);
+	digitalWrite(36,HIGH);
+	Serial.print("reset done");
+	digitalWrite(ETHERNET_CS, HIGH); 
+#endif
 #ifdef DEBUG
 	Serial.print("0 mem=");
 	Serial.println(freeMemory(),DEC);
@@ -478,7 +476,10 @@ void setup() {
 //	DL_time=rtc.getTime();
 	DL_time=rtc.getTime();
 	TS_init();		//Initialize temperature sensors
+#ifdef SDCARD
+	SD_init_wait=millis();
 	SD_ready=SD_init();
+#endif
 	DL_recordToBuffer();
 	Serial.print(DL_buffer);
 /*	if(DL_writeToFile(DL_buffer)){
@@ -493,14 +494,18 @@ void setup() {
 	// or the SD library functions will not work. 
 
 #ifdef WEBSERVER
-  uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0x05};
-  IPAddress myIP(192,168,1,159);
-  IPAddress myIP2(192,168,1,160);
-  IPAddress myIP3(192,168,1,160);
-  IPAddress myIP4(255,255,255,0);
+  uint8_t mac[6] = {0xDE,0xAD,0x02,0x03,0x04,0x05};
+  //IPAddress myIP(192,168,1,159);
+  IPAddress myIP(10,57,5,14);
+  IPAddress myIP2(10,57,5,3);
+  IPAddress myIP3(10,57,5,1);
+  IPAddress myIP4(255,255,255,0); 
 
-  Ethernet.begin(mac,myIP);
-
+  //Ethernet.begin(mac,myIP);
+//  digitalWrite(ETHERNET_CS, LOW); 
+  Serial.println("Start init");
+  //Ethernet.begin(mac,myIP);
+  Ethernet.begin(mac,myIP,myIP2,myIP3,myIP4);
 #ifdef DEBUG
   Serial.print("localIP: ");
   Serial.println(Ethernet.localIP());
@@ -527,28 +532,77 @@ void setup() {
 char old_second = 0;
 unsigned long ticks = 0;
 */
+void webRequest(EthernetClient *client){
+	int size;
+	int free=sizeof(request_data-16);
+	int i;
+	char *request_data_ptr=request_data;
+	      while((size = client->available()) > 0)
+	{
+	 size = client->read((uint8_t *)request_data_ptr,free);
+	 Serial.print("size ");
+	 Serial.print(size,DEC);
+	 Serial.print(" free ");
+	 Serial.println(free,DEC);
+	  if (size <0) {
+		goto failure;
+	  }
+	 *(request_data_ptr+size)=0;
+#ifdef DEBUG
+	 Serial.print("<-: ");
+	 Serial.println(request_data_ptr);
+#endif
+		for(i=0;i<size;i++) {
+			if(*(request_data_ptr+i)=='\n'){
+				*(request_data_ptr+i)=0;
+				goto parse_request;
+			}
+		}
+		request_data_ptr+=size;
+		free-=size;
+		if(free<=0) {
+			goto failure;
+		}
+	}
+parse_request:
+#ifdef DEBUG
+	 Serial.print("got: ");
+	 Serial.println(request_data);
+#endif
+	goto end;
+failure:
+	client->println("HTTP/1.1 400 webRequest processing failure");
+	goto end;
+end:
+	client->stop();
+	return;
+}
 void loop() {
+#ifdef SDCARD
 	if(!SD_ready) {
 		SD_ready=SD_init();
+	digitalWrite(SD_CS, HIGH); 
 	}
+	if(SD_ready && DL_data_to_write){
+		if(SD_ready=DL_writeToFile(DL_buffer)){
+			DL_data_to_write=false;
+		}
+	digitalWrite(SD_CS, HIGH); 
+	
+	}
+	digitalWrite(SD_CS, HIGH); 
+#endif
 #ifdef WEBSERVER
-	int size;
 	  if (EthernetClient client = server.available())
 	    {
-	      while((size = client.available()) > 0)
-		{
-		  size = client.read(nulldata,16);
-		 Serial.print("size ");
-		 Serial.println(size,DEC);
-		  if (size <0) {
-			Serial.println("error");
-		  }
-		}
-	      client.println("<H1>DATA from Server!");
-	      client.println(DL_buffer);
-	      client.println("</H1>");
-	      client.stop();
+	      webRequest(&client);
 	    }
 #endif
-	delay(1000);
+	Serial.print("SPCR ");
+	Serial.print(SPCR,HEX); 
+	Serial.print(" ETH ");
+	Serial.print(digitalRead(ETHERNET_CS),DEC); 
+	Serial.print("CS ");
+	Serial.println(digitalRead(SD_CS),DEC); 
+	delay(100);
 }
