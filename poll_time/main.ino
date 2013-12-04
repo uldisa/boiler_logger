@@ -444,17 +444,16 @@ bool ETH_init(void)
 {
 	uint8_t mac[6] = { 0xDE, 0xAD, 0x02, 0x03, 0x04, 0x05 };
 	//IPAddress myIP(192,168,1,159);
-	IPAddress myIP(10, 57, 5, 14);
+/*	IPAddress myIP(10, 57, 5, 14);
 	IPAddress myIP2(10, 57, 5, 3);
 	IPAddress myIP3(10, 57, 5, 1);
 	IPAddress myIP4(255, 255, 255, 0);
-/*  uint8_t mac[6] = {0xDE,0xAD,0x02,0x03,0x04,0x05};
-  //IPAddress myIP(192,168,1,159);
-  IPAddress myIP(10,57,5,14);
-  IPAddress myIP2(10,57,5,3);
-  IPAddress myIP3(10,57,5,1);
-  IPAddress myIP4(255,255,255,0); 
 */
+	IPAddress myIP(192,168,1,159);
+	IPAddress myIP2(192,168,1,3);
+	IPAddress myIP3(192,168,1,3);
+	IPAddress myIP4(255,255,255,0); 
+
 	//Ethernet.begin(mac,myIP);
 //  digitalWrite(ETHERNET_CS, LOW); 
 	Serial.println("Start init");
@@ -600,10 +599,12 @@ void setup()
 char old_second = 0;
 unsigned long ticks = 0;
 */
-char HTTP_RESP_200[]={"HTTP/1.x 200 OK"};
-char HTTP_RESP_400[]={"HTTP/1.x 400 failue"};
-char HTTP_RESP_401[]={"HTTP/1.x 401 Unauthorized"};
-char HTTP_RESP_404[]={"HTTP/1.x 404 Not Found"};
+char HTTP_RESP_200[]={"HTTP/1.1 200 OK"};
+char HTTP_RESP_400[]={"HTTP/1.1 400 failue"};
+char HTTP_RESP_401[]={"HTTP/1.1 401 Unauthorized"};
+char HTTP_RESP_404[]={"HTTP/1.1 404 Not Found"};
+char HTTP_HTML_START[]={"<!DOCTYPE HTML><html>"};
+char HTTP_HTML_END[]={"</html>"};
 void getRequest(UIPServer * server)
 {
 	SPCR = SPI_ETH_SPCR;
@@ -681,21 +682,34 @@ void getRequest(UIPServer * server)
 				goto send_file;
 			}
 		}
+		Serial.println("401");
 		client.println(HTTP_RESP_401);
 		goto end;
  send_summary:
+		Serial.println("200 buffer");
 		client.println(HTTP_RESP_200);
-		client.println(DL_buffer);
+		client.println(HTTP_HTML_START);
+		client.println("<p>");
+		client.print(DL_buffer);
+		client.println("</p>");
+		client.println(HTTP_HTML_END);
 		goto end;
  send_listing:
+		Serial.println("200 listing");
 		client.println(HTTP_RESP_200);
+		client.println(HTTP_HTML_START);
+		client.println("<p>");
 		client.println("Listing");
+		client.println("</p>");
+		client.println(HTTP_HTML_END);
 		goto end;
  send_file:
-		client.println(HTTP_RESP_200);
+		Serial.println("200 file");
+		//client.println(HTTP_RESP_200);
 		client.println(uri);
 		goto end;
  failure:
+		Serial.println("400");
 		client.println(HTTP_RESP_400);
 		goto end;
  end:
