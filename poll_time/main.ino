@@ -505,16 +505,16 @@ bool ETH_init(void)
 {
 	uint8_t mac[6] = { 0xDE, 0xAD, 0x02, 0x03, 0x04, 0x05 };
 	//IPAddress myIP(192,168,1,159);
-/*	IPAddress myIP(10, 57, 5, 14);
+	IPAddress myIP(10, 57, 5, 14);
 	IPAddress myIP2(10, 57, 5, 3);
 	IPAddress myIP3(10, 57, 5, 1);
 	IPAddress myIP4(255, 255, 255, 0);
-*/
-	IPAddress myIP(192,168,1,159);
+
+/*	IPAddress myIP(192,168,1,159);
 	IPAddress myIP2(192,168,1,3);
 	IPAddress myIP3(192,168,1,3);
 	IPAddress myIP4(255,255,255,0); 
-
+*/
 	//Ethernet.begin(mac,myIP);
 //  digitalWrite(ETHERNET_CS, LOW); 
 	Serial.println("Start init");
