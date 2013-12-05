@@ -277,6 +277,67 @@ void print_error(int line, int code1, int code2)
 }
 
 #ifdef SDCARD
+bool DL_dump_file(UIPClient *client,const char *f_name){
+	if(!SD_ready) {
+		Serial.println("sdcard not ready");
+		return false;
+	}
+	SPCR=SPI_SD_SPCR;
+	SPSR=SPI_SD_SPSR;
+	SdFile F;
+	if (!F.open(&root, f_name,
+				  (uint8_t) O_READ )) {
+			Serial.println("File open failed");
+			client->print("HTTP/1.1 400 Cannot open file\r\n\r\n");
+			return false;
+		}
+	SPCR=SPI_ETH_SPCR;
+	SPSR=SPI_ETH_SPSR;
+	client->print("HTTP/1.1 200 OK\r\n");
+//	client->print("Content-type: application/force-download\r\n");
+//	client->print("Content-Disposition: attachment; filename=\""); 
+//	client->print(f_name); 
+//	client->print("\"\r\n"); 
+	client->print("Content-length: ");
+	client->print(F.fileSize());
+	client->print("\r\n\r\n");
+	int n=0;
+	char read[512];
+
+	SPCR=SPI_SD_SPCR;
+	SPSR=SPI_SD_SPSR;
+	while((n=F.read(read,512))>0) {
+		SPCR=SPI_ETH_SPCR;
+		SPSR=SPI_ETH_SPSR;
+		client->write((const uint8_t *)read,n);
+		SPCR=SPI_SD_SPCR;
+		SPSR=SPI_SD_SPSR;
+	}
+	F.close();
+	SPCR=SPI_ETH_SPCR;
+	SPSR=SPI_ETH_SPSR;
+}
+bool DL_list_files(UIPClient *client){
+	if(!SD_ready) {
+		client->print("sdcard not ready");
+		return false;
+	}
+	dir_t p;
+	int8_t n;
+	char f_name[13];
+	root.rewind();
+	while((n=root.readDir(&p))>0){
+		root.dirName(p,f_name);
+		client->print("<li><a href=\"/data/");
+		client->print(f_name);
+		client->print("\"> ");
+		client->print(f_name);
+		client->print(" ");
+		client->print(p.fileSize);
+		client->print("</a></li>\r\n");
+	}
+	return true;
+}
 bool DL_writeToFile(const char *buff)
 {
 	digitalWrite(ETHERNET_CS, HIGH);
@@ -599,11 +660,11 @@ void setup()
 char old_second = 0;
 unsigned long ticks = 0;
 */
-char HTTP_RESP_200[]={"HTTP/1.1 200 OK"};
-char HTTP_RESP_400[]={"HTTP/1.1 400 failue"};
-char HTTP_RESP_401[]={"HTTP/1.1 401 Unauthorized"};
-char HTTP_RESP_404[]={"HTTP/1.1 404 Not Found"};
-char HTTP_HTML_START[]={"<!DOCTYPE HTML><html>"};
+char HTTP_RESP_200[]={"HTTP/1.1 200 OK\r\n"};
+char HTTP_RESP_400[]={"HTTP/1.1 400 failue\r\n"};
+char HTTP_RESP_401[]={"HTTP/1.1 401 Unauthorized\r\n"};
+char HTTP_RESP_404[]={"HTTP/1.1 404 Not Found\r\n"};
+char HTTP_HTML_START[]={"Content-Type: text/html\r\n\r\n<!DOCTYPE HTML><html>"};
 char HTTP_HTML_END[]={"</html>"};
 void getRequest(UIPServer * server)
 {
@@ -671,7 +732,11 @@ void getRequest(UIPServer * server)
 			goto end;
 		}
 		if(!strcmp(uri,"/")) {
-			goto send_summary;
+			strcpy(uri,"index.htm");
+			goto send_file;
+		}
+		if(!strcmp(uri,"/sensors")) {
+			goto send_buffer;
 		}
 		if(!strcmp(uri,"/data")) {
 			goto send_listing;
@@ -680,33 +745,32 @@ void getRequest(UIPServer * server)
 			uri=uri+6;
 			if(strlen(uri)>1){
 				goto send_file;
+			} else {
+				goto send_listing;
 			}
 		}
-		Serial.println("401");
-		client.println(HTTP_RESP_401);
-		goto end;
- send_summary:
-		Serial.println("200 buffer");
+		uri=uri++;
+		goto send_file;
+ send_buffer:
+		Serial.print("200 buffer");
 		client.println(HTTP_RESP_200);
-		client.println(HTTP_HTML_START);
-		client.println("<p>");
 		client.print(DL_buffer);
-		client.println("</p>");
-		client.println(HTTP_HTML_END);
 		goto end;
  send_listing:
 		Serial.println("200 listing");
-		client.println(HTTP_RESP_200);
-		client.println(HTTP_HTML_START);
-		client.println("<p>");
-		client.println("Listing");
-		client.println("</p>");
-		client.println(HTTP_HTML_END);
+		client.print(HTTP_RESP_200);
+		client.print(HTTP_HTML_START);
+		client.print("<p>");
+		client.print("Listing");
+		client.print("</p>");
+		DL_list_files(&client);
+		client.print(HTTP_HTML_END);
 		goto end;
  send_file:
-		Serial.println("200 file");
+		Serial.print("200 file");
+		Serial.println(uri);
 		//client.println(HTTP_RESP_200);
-		client.println(uri);
+		DL_dump_file(&client,uri);
 		goto end;
  failure:
 		Serial.println("400");
