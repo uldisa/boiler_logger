@@ -37,7 +37,8 @@
 </script>
 
 <script>
-$(document).ready(function(){
+//$(document).ready(function(){
+function getSensors() {
 	$.get("/sensors",function(data,status){
 		var values=data.toString().split("\t");
 		var temp_id;
@@ -47,7 +48,11 @@ $(document).ready(function(){
 			document.getElementById(temp_id).innerHTML=values[i];
 		}
 	},'text');
-});
+}
+getSensors();
+setInterval(function(){getSensors();}
+,1000);
+//});
 </script>
 
 
