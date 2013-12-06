@@ -12,25 +12,36 @@
 #include <EtherCard.h>
 #include <tinyFAT.h>
 #include <avr/pgmspace.h>
-#define TCP_FLAGS_FIN_V 1 //as declared in net.h
-#define TCP_FLAGS_ACK_V 16 //as declared in net.h
-static byte myip[] = { 192,168,0,66 };
-static byte gwip[] = { 192,168,0,250 };
+//#define TCP_FLAGS_FIN_V 1 //as declared in net.h
+//#define TCP_FLAGS_ACK_V 16 //as declared in net.h
+#define ETHERNET_CS 53
+#define SD_CS 48
+
+static byte myip[] = { 10,57,5,14 };
+static byte gwip[] = { 10,57,5,1 };
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x39 };
 byte Ethernet::buffer[700]; // tcp/ip send and receive buffer
 unsigned long cur;
 unsigned long pos;
 byte res;
 
+byte streamfile (char* name , byte lastflag);
+byte sendfiles(char* name);
+void not_found();
+
 void setup() {
   // Initialize serial communication at 115200 baud
+	pinMode(ETHERNET_CS, OUTPUT);	// change this to 53 on a mega
+	pinMode(SD_CS, OUTPUT);	// change this to 53 on a mega
   Serial.begin(115200);
   // Initialize tinyFAT 
   // You might need to select a lower speed than the default SPISPEED_HIGH
-    file.setSSpin(4);
+   Serial.println("Starting SD");
+	
+    file.setSSpin(SD_CS);
   res=file.initFAT(0); 
   if (res==NO_ERROR)    Serial.println("SD started");
-  ether.begin(sizeof Ethernet::buffer, mymac , 10); //53 on mega ethernet shield 10 on others
+  ether.begin(sizeof Ethernet::buffer, mymac , ETHERNET_CS); //53 on mega ethernet shield 10 on others
   ether.staticSetup(myip, gwip);
   Serial.println("ETH started");
 }  
