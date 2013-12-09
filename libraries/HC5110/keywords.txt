@@ -1,0 +1,10 @@
+KEYWORD1   HC5110
+KEYWORD2   Clear
+KEYWORD2   Home
+KEYWORD2   Cursor
+KEYWORD2   Contrast
+KEYWORD2   WriteData
+KEYWORD2   WriteCommand
+KEYWORD2   Bitmap
+KEYWORD2   Print
+KEYWORD2   Print
