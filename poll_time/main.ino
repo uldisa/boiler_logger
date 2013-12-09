@@ -1,5 +1,5 @@
 #define ENC28J60DEBUG 1
-#define SDCARD 1
+//#define SDCARD 1
 #define WEBSERVER 1
 //#define HALL 1
 #define DEBUG  1
@@ -33,7 +33,7 @@ Sd2Card card;
 SdVolume volume;
 SdFile root;
 volatile bool SD_ready = false;
-unsigned long SD_init_wait;
+
 SdFile SD_file;
 int SD_file_date = 0;
 #endif
@@ -261,6 +261,21 @@ void DL_recordToBuffer(void)
 			      (unsigned int)((double)total_average * 100.0) %
 			      100, 0);
 #endif
+	*(DL_buffer_position++) = '\t';
+	DL_buffer_position +=
+	    sprintfDec_padded(DL_buffer_position, 22.2222, 4);
+	*(DL_buffer_position++) = '\t';
+	DL_buffer_position +=
+	    sprintfDec_padded(DL_buffer_position, 33.3333, 4);
+	*(DL_buffer_position++) = '\t';
+	DL_buffer_position +=
+	    sprintfDec_padded(DL_buffer_position, 44.4444, 4);
+	*(DL_buffer_position++) = '\t';
+	DL_buffer_position +=
+	    sprintfDec_padded(DL_buffer_position, 55.5555, 4);
+	*(DL_buffer_position++) = '\t';
+	DL_buffer_position +=
+	    sprintfDec_padded(DL_buffer_position, 66.6666, 4);
 	*(DL_buffer_position++) = '\r';
 	*(DL_buffer_position++) = '\n';
 
@@ -505,16 +520,16 @@ bool ETH_init(void)
 {
 	uint8_t mac[6] = { 0xDE, 0xAD, 0x02, 0x03, 0x04, 0x05 };
 	//IPAddress myIP(192,168,1,159);
-	IPAddress myIP(10, 57, 5, 14);
+/*	IPAddress myIP(10, 57, 5, 14);
 	IPAddress myIP2(10, 57, 5, 3);
 	IPAddress myIP3(10, 57, 5, 1);
 	IPAddress myIP4(255, 255, 255, 0);
-
-/*	IPAddress myIP(192,168,1,159);
+*/
+	IPAddress myIP(192,168,1,159);
 	IPAddress myIP2(192,168,1,3);
 	IPAddress myIP3(192,168,1,3);
 	IPAddress myIP4(255,255,255,0); 
-*/
+
 	//Ethernet.begin(mac,myIP);
 //  digitalWrite(ETHERNET_CS, LOW); 
 	Serial.println("Start init");
@@ -546,10 +561,6 @@ bool ETH_init(void)
 #ifdef SDCARD
 bool SD_init(void)
 {
-	if (SD_init_wait > millis()) {
-		return SD_ready;
-	}
-	SD_init_wait = millis() + 1000;
 	SD_file.close();	//drop open flag
 #ifdef DEBUG
 	Serial.print("\nInitializing SD card...");
@@ -632,9 +643,6 @@ void setup()
 //      DL_time=rtc.getTime();
 	DL_time = rtc.getTime();
 	TS_init();		//Initialize temperature sensors
-#ifdef SDCARD
-	SD_init_wait = 0;
-#endif
 	DL_recordToBuffer();
 	Serial.print(DL_buffer);
 /*	if(DL_writeToFile(DL_buffer)){
@@ -763,14 +771,18 @@ void getRequest(UIPServer * server)
 		client.print("<p>");
 		client.print("Listing");
 		client.print("</p>");
+#ifdef SDCARD
 		DL_list_files(&client);
+#endif
 		client.print(HTTP_HTML_END);
 		goto end;
  send_file:
 		Serial.print("200 file");
 		Serial.println(uri);
 		//client.println(HTTP_RESP_200);
+#ifdef SDCARD
 		DL_dump_file(&client,uri);
+#endif
 		goto end;
  failure:
 		Serial.println("400");
@@ -784,30 +796,44 @@ void getRequest(UIPServer * server)
 
 void loop()
 {
+
 #ifdef WEBSERVER
 	EthernetServer server = EthernetServer(80);
-	ETH_init();
-	server.begin();
+				ETH_init();
+				server.begin();
+
+	unsigned long ETH_init_wait=0;
+#endif
+#ifdef SDCARD
+	unsigned long SD_init_wait=0;
 #endif
 
 	while (true) {
 #ifdef SDCARD
 		if (!SD_ready) {
-			if ((SD_ready = SD_init())) {
-				ETH_init();
-				server.begin();
+			if (SD_init_wait < millis()) {
+				SD_init_wait = millis() + 1000;
+				SD_ready = SD_init();
 			}
-
-		}
-		if (SD_ready && DL_data_to_write) {
-			if ((SD_ready = DL_writeToFile(DL_buffer))) {
-				DL_data_to_write = false;
+		} else {
+			if (DL_data_to_write) {
+				if ((SD_ready = DL_writeToFile(DL_buffer))) {
+					DL_data_to_write = false;
+				}
 			}
-
 		}
 #endif
 #ifdef WEBSERVER
-		getRequest(&server);
+		if(!Ethernet.network.isLinkUp()) {
+			if (ETH_init_wait < millis()) {
+				ETH_init_wait = millis() + 1000;
+				ETH_init();
+				server.begin();
+			}
+			digitalWrite(ETHERNET_CS, HIGH);
+		} else {
+			getRequest(&server);
+		}
 #endif
 	}
 }
