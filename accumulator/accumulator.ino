@@ -1,4 +1,5 @@
 #include <MemoryFree.h>
+#include "HC5110.h"
 /*
 MODULE   UNO
 RST      14
@@ -42,6 +43,7 @@ void loop()
   LCD.Print("Free: ");
   LCD.Print(freeMemory(),0);
   LCD.Cursor(0, 4);
+  LCD.PrintDigit("0");
 //  if(input[0]!=0){
 //  LCD.Print(input);}
 //  Serial.println(input);
