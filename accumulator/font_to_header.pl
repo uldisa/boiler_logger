@@ -5,7 +5,8 @@ use Data::Dumper;
 my $font_hight=14;
 my $count=0;
 my $asc=0;
-print STDOUT "const byte Font[][".$font_hight."] =\n{\n";
+print STDOUT "#include <avr/pgmspace.h>\n";
+print STDOUT "prog_char Font[][".$font_hight."] PROGMEM =\n{\n";
 
 while(defined(my $char=getc(STDIN))) {
 	if(($count % $font_hight)==0) {

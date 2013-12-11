@@ -123,8 +123,10 @@ void PCD8544::putChar(uint8_t c )
 	if(cursorY>6){
 		return ;
 	}
-	for(Xind=0;Xind<14;Xind++) {
-		WriteData(pgm_read_byte_near(&(BIGSERIF[c][Xind])));  
+	if(c>=32 and c<=127) {
+		for(Xind=0;Xind<14;Xind++) {
+			WriteData(pgm_read_byte_near(&(BIGSERIF[c-32][Xind])));  
+		}
 	}
 	Cursor(++cursorX, cursorY);
 }
