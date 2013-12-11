@@ -1,49 +1,5 @@
-/* FILE:    HC5110.h
-   DATE:    06/09/13
-   VERSION: 0.1
-   AUTHOR:  Andrew Davies
-
-Library header for Nokia 5110 LCD display module.
-
-You may copy, alter and reuse this code in any way you like, but please leave
-reference to HobbyComponents.com in your comments if you redistribute this code.
-This software may not be used directly for the purpose of selling products that
-directly compete with Hobby Components Ltd's own range of products.
-
-THIS SOFTWARE IS PROVIDED "AS IS". HOBBY COMPONENTS MAKES NO WARRANTIES, WHETHER
-EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ACCURACY OR LACK OF NEGLIGENCE.
-HOBBY COMPONENTS SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR ANY DAMAGES,
-INCLUDING, BUT NOT LIMITED TO, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY
-REASON WHATSOEVER.
-*/
-
-#ifndef HC5110_h
-#define HC5110_h
-
-#include "Arduino.h"
-
-/* 8x8 Font bitmap */
-const byte Font8x14[][14] =
-{
- {
-  0b00111000,
-  0b01111100,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b11000110,
-  0b01111100,
-  0b00111000,
-  0b00000000
- }
-};
-const byte Font8x8[][8] = 
+#include <avr/pgmspace.h>
+prog_char Font8x8[][8] PROGMEM = 
 {
   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
   {0x00,0x00,0x00,0x4F,0x4F,0x00,0x00,0x00},
@@ -142,47 +98,3 @@ const byte Font8x8[][8] =
   {0x00,0x10,0x08,0x08,0x18,0x10,0x10,0x08}
 };
 
-/* LCD screen dimension. Y dimension is in blocks of 8 bits */
-#define LCDCOLS  84
-#define LCDYVECTORS  6
-
-/* Display modes */
-#define BLANK 0x08
-#define ALL_ON 0x09
-#define NORMAL 0x0C
-#define INVERSE 0x0D
-
-/* LCD command sets*/
-#define BASIC_COMMAND 0x20
-#define EXTENDED_COMMAND 0x21
-
-
-class HC5110
-{
-  public:
-
-  HC5110(byte RST, byte CE, byte DC, byte Din, byte Clk);
-  void Clear(void);
-  void Home(void);
-  void Cursor(byte XPos, byte YPos);
-  void Contrast(byte Level);
-  void WriteData(byte Data);
-  void WriteCommand(byte Command);
-  void Bitmap(byte Cols, byte ByteRows, const byte BitmapData[]);
-  void Print(char TextString[]);
-  void PrintDigit(char TextString[]);
-  void Print(long Value);
-  void Print(int long Value, byte DecimalPlaces);
-
-  
-  private:
-  byte _RST;
-  byte _CE;
-  byte _DC;
-  byte _Din;
-  byte _Clk;
-  void DisplayMode(byte Mode);
-  
-};
-
-#endif

@@ -19,4 +19,4 @@ PROGRAMMER=arduino
 #USER_LIB_PATH=$(CURDIR)/../libraries
 include ../lib.mk
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
-accumulator.elf: accumulator.o HC5110.o libMemoryFree.a  libcore.a
+accumulator.elf: accumulator.o PCD8544.o libMemoryFree.a  libcore.a
