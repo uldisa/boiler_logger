@@ -16,7 +16,6 @@
 #define BASIC_COMMAND 0x20
 #define EXTENDED_COMMAND 0x21
 
-
 class PCD8544
 {
   public:
@@ -30,7 +29,11 @@ class PCD8544
   void WriteCommand(byte Command);
   void Bitmap(byte Cols, byte ByteRows, const byte BitmapData[]);
   void putChar(uint8_t c);
-  void Print(const char TextString[]);
+  void putChar(uint8_t c,prog_char *font,bool invert);
+  void print(const char TextString[],bool invert);
+  void print(const char TextString[]);
+  void printFloatString(const char TextString[]);
+  void drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to);
 
   
   private:

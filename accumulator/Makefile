@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core MemoryFree
+LIBS=core MemoryFree DallasTemperature OneWire
 #PORT=/dev/ttyACM0
 #PORT=COM11
 #CPU=atmega2560
@@ -19,4 +19,4 @@ PROGRAMMER=arduino
 #USER_LIB_PATH=$(CURDIR)/../libraries
 include ../lib.mk
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
-accumulator.elf: accumulator.o PCD8544.o libMemoryFree.a  libcore.a
+accumulator.elf: accumulator.o PCD8544.o libMemoryFree.a libDallasTemperature.a libOneWire.a libcore.a

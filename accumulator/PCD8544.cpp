@@ -2,6 +2,9 @@
 #include "PCD8544.h"
 #include <avr/pgmspace.h>
 #include "BIGSERIF.h"
+#include "ANTIQUE.h"
+#include "THINASCI7.h"
+#include "VGAROM8.h"
 /* Constructor to initiliase the GPIO and screen */
 PCD8544::PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk)
 {
@@ -106,9 +109,10 @@ void PCD8544::WriteCommand(byte Command)
   digitalWrite(_CE, HIGH);
 }
    
-void PCD8544::putChar(uint8_t c )
+void PCD8544::putChar(uint8_t c ,prog_char *font,bool invert)
 {
 	byte Xind;
+	byte data;
 	switch (c) {
 	case '\n':
 		Cursor(0, cursorY+1);
@@ -125,16 +129,67 @@ void PCD8544::putChar(uint8_t c )
 	}
 	if(c>=32 and c<=127) {
 		for(Xind=0;Xind<14;Xind++) {
-			WriteData(pgm_read_byte_near(&(BIGSERIF[c-32][Xind])));  
+			data=pgm_read_byte_near(&(font[(c-32)*14+Xind]));
+			if(invert){
+				data=~data;
+			}
+
+			WriteData(data);  
 		}
 	}
 	Cursor(++cursorX, cursorY);
 }
-void PCD8544::Print(const char TextString[])
+void PCD8544::putChar(uint8_t c)
+{
+	PCD8544::putChar(c,(prog_char *)BIGSERIF,false);
+}
+void PCD8544::print(const char TextString[],bool invert)
 {
   const char *p=TextString;
   while(*p!=0){
-	putChar(*p);
+	putChar(*p,(prog_char *)BIGSERIF,invert);
 	p++;
   }
+}
+void PCD8544::print(const char TextString[])
+{
+	print(TextString,false);
+}
+void PCD8544::printFloatString(const char TextString[])
+{
+  const char *p=TextString;
+  while(*p!=0){
+	putChar(*p,(prog_char *)BIGSERIF,false);
+	p++;
+	if(*p=='.'){
+		p++;
+		while(*p!=0) {
+			putChar(*p,(prog_char *)VGAROM8,false);
+			p++;
+		}
+	}
+  }
+}
+void PCD8544::drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to)
+{
+  //set cursor
+	uint8_t bank;
+	uint8_t i;
+	uint8_t data;
+	int val;
+	for(bank=0;bank<6;bank++) {
+		WriteCommand(0x40 | (5-bank)); 
+		WriteCommand(0x80 | offset);
+		for(i=0;i<width;i++) {
+			data=0xFF;
+			val=from+(to-from)*i/width-8*bank;
+			if(val<0) {
+				data=0;
+			}
+			if(val<8) {
+				data = data << (8-val);
+			}
+			WriteData(data);  
+		}
+	}
 }
