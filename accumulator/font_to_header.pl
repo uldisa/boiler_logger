@@ -2,13 +2,18 @@
 use strict;
 use Data::Dumper;
 
-my $font_hight=14;
+my $in=$ARGV[0];
+my $font_hight=$ARGV[1];
 my $count=0;
 my $asc=0;
+print STDERR $in;
+my $F;
+open ($F,'<',$in);
 print STDOUT "#include <avr/pgmspace.h>\n";
-print STDOUT "prog_char Font[][".$font_hight."] PROGMEM =\n{\n";
+print STDOUT "prog_char ".(split /\./,$in)[0]."[][".$font_hight."] PROGMEM =\n{\n";
 
-while(defined(my $char=getc(STDIN))) {
+
+while(defined(my $char=getc($F))) {
 	if(($count % $font_hight)==0) {
 		if($count>0) {
 			print STDOUT ",\n";

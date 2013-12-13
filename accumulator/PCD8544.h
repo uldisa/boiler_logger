@@ -16,21 +16,29 @@
 #define BASIC_COMMAND 0x20
 #define EXTENDED_COMMAND 0x21
 
+extern uint8_t PCD8544_RAM[6][84];
+extern uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
+
 class PCD8544
 {
   public:
   uint8_t cursorX;
   uint8_t cursorY;
+  uint8_t fontHight;
+  uint8_t fontWidth;
+  prog_char *font;
   PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk);
-  void Clear(void);
-  void Cursor(byte XPos, byte YPos);
   void Contrast(byte Level);
   void WriteData(byte Data);
   void WriteCommand(byte Command);
-  void Bitmap(byte Cols, byte ByteRows, const byte BitmapData[]);
+
+  void Clear(void); //clears display
+  void GoTo(byte XPos, byte YPos);
+  void Cursor(byte XPos, byte YPos);
+  void DisplayFlush(); // Sends whole RAM to display
+  void DisplayUpdate(); // Plate only changed bytes
+  void setFont(prog_char *font,int8_t width,int8_t height); 
   void putChar(uint8_t c);
-  void putChar(uint8_t c,prog_char *font,bool invert);
-  void print(const char TextString[],bool invert);
   void print(const char TextString[]);
   void printFloatString(const char TextString[]);
   void drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to);
