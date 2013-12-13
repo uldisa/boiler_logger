@@ -3,6 +3,7 @@
 #include <PCD8544.h>
 #include <HardwareSerial.h>
 #include <string.h>
+#include "BIGSERIF.h"
 
 PCD8544 LCD(14,13,12,11,10);
 char str[10];
@@ -10,7 +11,9 @@ int main(void) {
 	int x,y;
 	init();
 	Serial.begin(115200);
+	LCD.Contrast(0xB0);
 	LCD.Clear();
+//	LCD.setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
 	LCD.print("Test 1\nClear");
 	LCD.DisplayFlush();
 	delay(500);	

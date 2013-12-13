@@ -15,7 +15,8 @@
 /* LCD command sets*/
 #define BASIC_COMMAND 0x20
 #define EXTENDED_COMMAND 0x21
-
+#define F_UP_DOWN 0 
+#define F_LEFT_RIGHT 1
 extern uint8_t PCD8544_RAM[6][84];
 extern uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
 
@@ -26,6 +27,7 @@ class PCD8544
   uint8_t cursorY;
   uint8_t fontHight;
   uint8_t fontWidth;
+  bool	font_direction; 
   prog_char *font;
   PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk);
   void Contrast(byte Level);
@@ -37,7 +39,7 @@ class PCD8544
   void Cursor(byte XPos, byte YPos);
   void DisplayFlush(); // Sends whole RAM to display
   void DisplayUpdate(); // Plate only changed bytes
-  void setFont(prog_char *font,int8_t width,int8_t height); 
+  void setFont(prog_char *font,int8_t width,int8_t height,bool direction); 
   void putChar(uint8_t c);
   void print(const char TextString[]);
   void printFloatString(const char TextString[]);

@@ -1,3 +1,5 @@
+#ifndef BIGSERIF_H
+#define BIGSERIF_H
 #include <avr/pgmspace.h>
 prog_char BIGSERIF[][14] PROGMEM =
 {
@@ -1538,3 +1540,4 @@ prog_char BIGSERIF[][14] PROGMEM =
 		0b00000000
 	}
 };
+#endif

@@ -5,7 +5,8 @@
 //#include "ANTIQUE.h"
 //#include "THINASCI7.h"
 //#include "VGAROM8.h"
-#include "THINSS8.h"
+//#include "THINSS8.h"
+#include "font5x8.h"
 /* Constructor to initiliase the GPIO and screen */
 uint8_t PCD8544_RAM[6][84];
 uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
@@ -43,7 +44,7 @@ PCD8544::PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk)
   
   /* Set the display mode to normal */
   DisplayMode(NORMAL);
-	setFont(&THINSS8[0][0],7,8);
+	setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
 }
 void PCD8544::DisplayFlush(void) {
 	uint8_t *p=&PCD8544_RAM[0][0];
@@ -134,14 +135,15 @@ void PCD8544::WriteCommand(byte Command)
   digitalWrite(_CE, HIGH);
 }
    
-void PCD8544::setFont(prog_char *f,int8_t width,int8_t height){
+void PCD8544::setFont(prog_char *f,int8_t width,int8_t height,bool direction){
 	font=f;
 	fontWidth=width;
 	fontHight=height;
+	font_direction=direction;
 } 
 void PCD8544::putChar(uint8_t c)
 {
-	uint8_t bank,i;
+	uint8_t bank,i,j;
 	uint16_t mask,data;
 	uint8_t off,val,newval;
 	switch (c) {
@@ -163,10 +165,21 @@ void PCD8544::putChar(uint8_t c)
 		bank=cursorX/8;	
 		off=cursorX%8;	
 		for(i=0;i<fontHight;i++) {
-			mask=0xFF;
-			data=pgm_read_byte_near(&(font[(c-32)*fontHight+i]));
-			mask<<=(8-off);
-			data<<=(8-off);
+			mask=0xFF00;
+			if(font_direction==F_UP_DOWN) {
+				data=pgm_read_byte_near(&(font[(c-32)*fontHight+i]));
+				data<<=8;
+			} else {
+				data=0;
+				for(j=0;j<fontWidth;j++) {
+					data>>=1;
+					if((pgm_read_byte_near(&(font[(c-32)*fontWidth+fontWidth-j-1]))>>i)&0x01) {
+						data|=0x8000;
+					}
+				}
+			}
+			mask>>=off;
+			data>>=off;
 			val=PCD8544_RAM[5-bank][cursorY+i];
 			newval=val&~(uint8_t)((uint16_t)(mask>>8));
 			newval|=(uint8_t)((uint16_t)(data>>8));
