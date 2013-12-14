@@ -200,14 +200,6 @@ void PCD8544::putChar(uint8_t c)
 	}
 	GoTo(cursorX+fontWidth, cursorY);
 }
-void PCD8544::print(const char TextString[])
-{
-  const char *p=TextString;
-  while(*p!=0){
-	putChar(*p);
-	p++;
-  }
-}
 void PCD8544::printFloatString(const char TextString[])
 {
   const char *p=TextString;
@@ -242,4 +234,16 @@ void PCD8544::drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to)
 			}
 		}
 	}
+}
+size_t PCD8544::write(uint8_t c){
+	putChar(c);
+	return 1;
+}
+size_t PCD8544::write(const uint8_t *buffer, size_t size) {
+  const uint8_t *p=buffer;
+  while(size>0){
+	putChar(*p);
+	p++;
+	size--;
+  }
 }

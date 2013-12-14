@@ -1,7 +1,8 @@
 #ifndef PCD8544_h
 #define PCD8544_h
 
-#include "Arduino.h"
+#include <Print.h>
+//#include "Arduino.h"
 /* LCD screen dimension. Y dimension is in blocks of 8 bits */
 #define LCDCOLS  84
 #define LCDYVECTORS  6
@@ -20,7 +21,7 @@
 extern uint8_t PCD8544_RAM[6][84];
 extern uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
 
-class PCD8544
+class PCD8544:public Print
 {
   public:
   uint8_t cursorX;
@@ -41,10 +42,13 @@ class PCD8544
   void DisplayUpdate(); // Plate only changed bytes
   void setFont(prog_char *font,int8_t width,int8_t height,bool direction); 
   void putChar(uint8_t c);
-  void print(const char TextString[]);
   void printFloatString(const char TextString[]);
   void drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to);
 
+  size_t write(uint8_t);
+  size_t write(const uint8_t *buffer, size_t size);
+
+ 
   
   private:
   byte _RST;

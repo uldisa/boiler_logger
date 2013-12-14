@@ -4,8 +4,10 @@
 #include <HardwareSerial.h>
 #include <string.h>
 #include "BIGSERIF.h"
+#include "TemperatureSensor.h"
 
 PCD8544 LCD(14,13,12,11,10);
+TemperatureSensor TS(9);
 char str[10];
 int main(void) {
 	int x,y;
@@ -34,7 +36,10 @@ int main(void) {
 		}
 	}
 	LCD.DisplayUpdate();
-		
+	LCD.Cursor(0,4);
+	float f=1213.434;
+	LCD.println(f,DEC);		
+	LCD.DisplayUpdate();
 	while(1) {
 	}
 
