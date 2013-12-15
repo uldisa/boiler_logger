@@ -5,7 +5,7 @@
 #define TEMP_COUNT 6
 
 static int16_t tempRaw[TEMP_COUNT]={DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW};
-static float tempC[TEMP_COUNT]={75.0,72.0,60.0,40.0,30.0,28.0};
+static double tempC[TEMP_COUNT]={75.1,72.02,60.003,40.0004,30.0,28.12345};
 static DeviceAddress DA[TEMP_COUNT];
 
 TemperatureSensor::TemperatureSensor(uint8_t pin):OW(pin),DT(&OW){
@@ -23,7 +23,7 @@ void TemperatureSensor::init(void)
 	DT.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
 	DT.setWaitForConversion(true);
-	count=DT.getDeviceCount();
+//	count=DT.getDeviceCount();
 	for (int i = 0; i < count; i++) {
 		if (DT.getAddress(DA[i], i)) {
 #ifdef DEBUG
@@ -35,7 +35,7 @@ void TemperatureSensor::init(void)
 #endif
 			DT.setResolution(DA[i], TEMP_PRECISION );
 			tempRaw[i] = DT.getTemp(DA[i]);
-			tempC[i]=(float)tempRaw[i] * 0.0625;
+			tempC[i]=(double)tempRaw[i] * 0.0625;
 			// Enable asychronous temperature conversion
 
 		} else {

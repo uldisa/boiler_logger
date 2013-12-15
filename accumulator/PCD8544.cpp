@@ -44,6 +44,7 @@ PCD8544::PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk)
   
   /* Set the display mode to normal */
   DisplayMode(NORMAL);
+  	mode=OVERWRITE;
 	setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
 }
 void PCD8544::DisplayFlush(void) {
@@ -58,7 +59,7 @@ void PCD8544::DisplayFlush(void) {
 	int x,y;
 	int mask;
 	bool set_cursor;// For sequential update don't change cursor position
-	for(x=0;x<5;x++) {
+	for(x=0;x<=5;x++) {
 		mask=0x80>>x;
 		set_cursor=true;
 		WriteCommand(0x40 |(5-x)); 
@@ -93,7 +94,7 @@ void PCD8544::GoTo(byte X, byte Y) {
 } 
 void PCD8544::Cursor(byte X, byte Y) 
 {
-  GoTo(X*fontWidth,Y*fontWidth);
+  GoTo(X*fontWidth,Y*fontHight);
 }
 
 /* Sets the displays contrast */
@@ -141,6 +142,9 @@ void PCD8544::setFont(prog_char *f,int8_t width,int8_t height,bool direction){
 	fontHight=height;
 	font_direction=direction;
 } 
+void PCD8544::setMode(write_mode m) {
+	mode=m;
+}
 void PCD8544::putChar(uint8_t c)
 {
 	uint8_t bank,i,j;
@@ -154,10 +158,10 @@ void PCD8544::putChar(uint8_t c)
 		GoTo(cursorX%fontWidth, cursorY);
 		return;
 	} 
-	if(cursorX>48){
+	if(cursorX>=48){
 		return ;
 	}
-	if(cursorY>84){
+	if(cursorY>=84){
 		return ;
 	}
 	if(c>=32 and c<=127) {
@@ -181,16 +185,24 @@ void PCD8544::putChar(uint8_t c)
 			mask>>=off;
 			data>>=off;
 			val=PCD8544_RAM[5-bank][cursorY+i];
-			newval=val&~(uint8_t)((uint16_t)(mask>>8));
-			newval|=(uint8_t)((uint16_t)(data>>8));
+			if(mode==OVERWRITE) {
+				newval=val&~(uint8_t)((uint16_t)(mask>>8));
+				newval|=(uint8_t)((uint16_t)(data>>8));
+			} else {
+				newval=val^(uint8_t)((uint16_t)(data>>8));
+			}
 			if(newval!=val) {
 				PCD8544_RAM[5-bank][cursorY+i]=newval;
 				PCD8544_CHANGED_RAM[cursorY+i]|=0x80>>bank;
 			}
 			if(off && bank<5) {
 				val=PCD8544_RAM[4-bank][cursorY+i];
-				newval=val&~(mask&0xff);
-				newval|=(data&0xff);
+				if(mode==OVERWRITE) {
+					newval=val&~(mask&0xff);
+					newval|=(data&0xff);
+				} else {
+					newval=val^(data&0xff);
+				}
 				if(newval!=val) {
 					PCD8544_RAM[4-bank][cursorY+i]=newval;
 					PCD8544_CHANGED_RAM[cursorY+i]|=0x80>>(bank+1);
@@ -200,50 +212,17 @@ void PCD8544::putChar(uint8_t c)
 	}
 	GoTo(cursorX+fontWidth, cursorY);
 }
-void PCD8544::printFloatString(const char TextString[])
-{
-  const char *p=TextString;
-  while(*p!=0){
-	putChar(*p);
-	p++;
-	if(*p=='.'){
-		p++;
-		while(*p!=0) {
-			putChar(*p);
-			p++;
-		}
-	}
-  }
-}
-void PCD8544::drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to)
-{
-  //set cursor
-	uint8_t bank;
-	uint8_t i;
-	uint8_t data;
-	int val;
-	for(bank=0;bank<6;bank++) {
-		for(i=0;i<width;i++) {
-			data=0xFF;
-			val=from+(to-from)*i/width-8*bank;
-			if(val<0) {
-				data=0;
-			}
-			if(val<8) {
-				data = data << (8-val);
-			}
-		}
-	}
-}
 size_t PCD8544::write(uint8_t c){
 	putChar(c);
 	return 1;
 }
 size_t PCD8544::write(const uint8_t *buffer, size_t size) {
   const uint8_t *p=buffer;
-  while(size>0){
+  size_t s=size;
+  while(s>0){
 	putChar(*p);
 	p++;
-	size--;
+	s--;
   }
+  return size;
 }

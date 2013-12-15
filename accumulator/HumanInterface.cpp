@@ -1,54 +1,186 @@
 #include "HumanInterface.h"
-static char DL_buffer[10];
+#include "BIGSERIF.h"
+#include "font5x8.h"
+#define PRINT_BUFFER_SIZE 10
+#define REFRESH_INTERVAL 500
+static uint8_t printBuffer[PRINT_BUFFER_SIZE];
+HumanInterface::HumanInterface(PCD8544 * LCD, TemperatureSensor * TS):rTS(TS)
+	,rLCD(LCD)
+	,Buffer(printBuffer)
+	,BufferIndex(0)
+	,nextRefresh(0)
+	,Print_func(&HumanInterface::Print_graph)
+
+{
+	Print_func=&HumanInterface::Print_graph;
+} 
+void HumanInterface::Refresh(void) {
+	if(millis()>nextRefresh){
+		nextRefresh=millis()+REFRESH_INTERVAL;
+		(*this.*Print_func)();
+	}
+}
+void HumanInterface::next(void){
+	if(Print_func==&HumanInterface::Print_graph) {
+		Print_func=&HumanInterface::Print_temp;
+		return;
+	}
+	
+	if(Print_func==&HumanInterface::Print_temp) {
+		Print_func=&HumanInterface::Print_graph;
+		return;
+	}
+}
 void HumanInterface::Print_temp(void)
 {
 	uint8_t i;
-	rLCD->Cursor(0, 0);
+	uint8_t* p;
 	for (i = 0; i < rTS->count; i++) {
-		rLCD->Cursor(0, i);
-		rLCD->println(rLCD->tempC[i],DEC);
+		rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+		rLCD->GoTo(5, 14*i);
+		BufferIndex=0;
+		print(rTS->tempC[i],4);
+		p=Buffer;
+		while(*p) {
+			rLCD->putChar(*(p++));
+			if(*p=='.') {
+				p++;
+				break;
+			}
+		}	
+		rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+		rLCD->GoTo(rLCD->cursorX+2,rLCD->cursorY+5);
+		while(*p) {
+			rLCD->putChar(*(p++));
+		}	
 	}
 	rLCD->DisplayUpdate();
 }
 
 #define MIN_TEMP 20
 #define MAX_TEMP 85
+void HumanInterface::fillLeft(uint8_t from_x,uint8_t from_y ,int8_t to_x,int8_t to_y)
+{
+	uint8_t bank;
+	uint8_t y;
+	uint8_t val,newval;
+	int length;
+	for(bank=0;bank<6;bank++) {
+		for(y=from_y;y<to_y;y++) {
+			newval=0xFF;
+			length=from_x+(to_x-from_x)*(y-from_y)/(to_y-from_y)-8*bank;
+			if(length<0) {
+				newval=0;
+			}
+			if(length<8) {
+				newval <<= (8-length);
+			}
+			val=PCD8544_RAM[5-bank][y];
+			if(val != newval) {
+				PCD8544_RAM[5-bank][y]=newval;
+				PCD8544_CHANGED_RAM[y]|=0x80>>bank;
+			}
+		}
+	}
+}
 void HumanInterface::Print_graph(void)
 {
 	uint8_t i;
-	uint8_t j;
 	int8_t from;
 	int8_t to;
-	bool invert;
-	for (i = 0; i < ; i++) {
-		from = (DL_temp[i] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
-		to = (DL_temp[i + 1] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
-		if (i == 0) {
-			LCD->drawBar(0, 4, from, from);
-		}
-		LCD->drawBar(i * 16 + 4, 16, from, to);
-		if (i == 0) {
-			sprintFloat(DL_buffer, (float)DL_temp[0], 0);
-			to = strlen(DL_buffer);
-			if (from < 24) {
-				invert = false;
-				LCD->Cursor(6 - to, 0);
-			} else {
-				invert = true;
-				LCD->Cursor(0, 0);
-			}
-			LCD->print(DL_buffer, invert);
-		}
-
+	rLCD->setMode(OVERWRITE);
+	for (i = 0; i < rTS->count-1; i++) {
+		from = (rTS->tempC[i] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
+		to = (rTS->tempC[i + 1] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
+		fillLeft(from,i*84/(rTS->count-1) , to, (i+1)*84/(rTS->count-1) );
 	}
-	sprintFloat(DL_buffer, (float)DL_temp[5], 0);
-	to = strlen(DL_buffer);
-	if (from < 24) {
-		invert = false;
-		LCD->Cursor(6 - to, 5);
+	rLCD->setMode(XOR);
+	BufferIndex=0;
+	print((int)rTS->tempC[0],DEC);
+	if (rTS->tempC[0] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
+		rLCD->GoTo(48-strlen((const char *)Buffer)*8-4-5, 4);
 	} else {
-		invert = true;
-		LCD->Cursor(0, 5);
+		rLCD->GoTo(4, 4);
 	}
-	LCD->print(DL_buffer, invert);
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->print((const char *)Buffer);
+	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	rLCD->print('c');
+
+	BufferIndex=0;
+	print((int)rTS->tempC[rTS->count-1],DEC);
+	if (rTS->tempC[rTS->count] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
+		rLCD->GoTo(48-strlen((const char *)Buffer)*8-7, 84-14-4);
+	} else {
+		rLCD->GoTo(4, 84-14-4);
+	}
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->print((const char *)Buffer);
+	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	rLCD->print('c');
+
+	//print useful Mega calories. Assume accumulator size 1000liters
+	double Mcal=0;
+	double Mcal_full=MAX_TEMP;
+	int temp;
+	uint8_t* p;
+	for (i = 0; i < rTS->count-1; i++) {
+		temp=(rTS->tempC[i]+rTS->tempC[i + 1])/2-MIN_TEMP;
+		if(temp<0) {
+			temp=0;
+		}
+		Mcal+=temp/5;
+	}	
+
+	BufferIndex=0;
+	print(Mcal*100/Mcal_full,2);
+	p=Buffer;
+	rLCD->GoTo(10,42-14);
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	while(*p) {
+		rLCD->putChar(*(p++));
+		if(*p=='.') {
+			p++;
+			break;
+		}
+	}	
+	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	rLCD->GoTo(rLCD->cursorX+1,rLCD->cursorY+5);
+	while(*p) {
+		rLCD->putChar(*(p++));
+	}	
+	rLCD->GoTo(rLCD->cursorX+1,rLCD->cursorY-5);
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->putChar('%');
+
+
+	BufferIndex=0;
+	// strlen from 8 bit font + 20 points ("Mcal" font 5) 
+	print((int)Mcal,DEC);
+	rLCD->GoTo(24-(strlen((const char *)Buffer)*8+20)/2,42);
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->print((const char *)Buffer);
+
+	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	rLCD->GoTo(rLCD->cursorX,rLCD->cursorY+5);
+	rLCD->print("Mcal");
+
+
+	rLCD->setMode(OVERWRITE);
+	rLCD->DisplayUpdate();
+}
+size_t HumanInterface::write(uint8_t c){
+	if(BufferIndex>=PRINT_BUFFER_SIZE){
+		return 0;
+	}
+	Buffer[BufferIndex]=c;
+	BufferIndex++;
+	return 1;
+}
+size_t HumanInterface::write(const uint8_t *buffer, size_t size) {
+	size_t x=size+BufferIndex<PRINT_BUFFER_SIZE ? size : PRINT_BUFFER_SIZE-BufferIndex-1;
+	memcpy(Buffer+BufferIndex,buffer,x);
+	Buffer[BufferIndex+x]=0;
+	BufferIndex+=x;
+	return x;
 }

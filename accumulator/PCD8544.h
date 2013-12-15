@@ -20,7 +20,7 @@
 #define F_LEFT_RIGHT 1
 extern uint8_t PCD8544_RAM[6][84];
 extern uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
-
+enum write_mode { OVERWRITE, XOR };
 class PCD8544:public Print
 {
   public:
@@ -29,6 +29,7 @@ class PCD8544:public Print
   uint8_t fontHight;
   uint8_t fontWidth;
   bool	font_direction; 
+  write_mode mode;
   prog_char *font;
   PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk);
   void Contrast(byte Level);
@@ -41,9 +42,9 @@ class PCD8544:public Print
   void DisplayFlush(); // Sends whole RAM to display
   void DisplayUpdate(); // Plate only changed bytes
   void setFont(prog_char *font,int8_t width,int8_t height,bool direction); 
+  void setMode(write_mode m); 
   void putChar(uint8_t c);
   void printFloatString(const char TextString[]);
-  void drawBar(uint8_t offset,uint8_t width,int8_t from,int8_t to);
 
   size_t write(uint8_t);
   size_t write(const uint8_t *buffer, size_t size);

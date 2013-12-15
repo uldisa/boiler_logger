@@ -7,7 +7,7 @@
 class TemperatureSensor {
 public:
 	int16_t* tempRaw;
-	float* tempC;
+	double* tempC;
 	DeviceAddress* DA;
 	int conversionDelay;
 	int count;
