@@ -6,7 +6,14 @@
 
 static int16_t tempRaw[TEMP_COUNT]={DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW};
 static double tempC[TEMP_COUNT]={75.1,72.02,60.003,40.0004,30.0,28.12345};
-static DeviceAddress DA[TEMP_COUNT];
+static DeviceAddress DA[TEMP_COUNT]={
+	{0x28,0xe7,0x5f,0x60,0x05,0x00,0x00,0xed},
+	{0x28,0x11,0xda,0x5f,0x05,0x00,0x00,0xe6},
+	{0x28,0x01,0xc6,0x60,0x05,0x00,0x00,0x32},
+	{0x28,0xe6,0x53,0x60,0x05,0x00,0x00,0xfb},
+	{0x28,0x3c,0xa7,0x5f,0x05,0x00,0x00,0x9b},
+	{0x28,0x1c,0x04,0x60,0x05,0x00,0x00,0x82}
+};
 
 TemperatureSensor::TemperatureSensor(uint8_t pin):OW(pin),DT(&OW){
 	tempRaw=::tempRaw;
@@ -23,8 +30,12 @@ void TemperatureSensor::init(void)
 	DT.begin();		//sensor adresses are retrieved here and lost. This Sucks! 
 
 	DT.setWaitForConversion(true);
-//	count=DT.getDeviceCount();
+	//count=DT.getDeviceCount();
 	for (int i = 0; i < count; i++) {
+		DT.setResolution(DA[i], TEMP_PRECISION );
+		tempRaw[i] = DT.getTemp(DA[i]);
+		tempC[i]=(double)tempRaw[i] * 0.0625;
+/*		// Enable asychronous temperature conversion
 		if (DT.getAddress(DA[i], i)) {
 #ifdef DEBUG
 			Serial.print("Found device ");
@@ -43,6 +54,6 @@ void TemperatureSensor::init(void)
 			print_error(__LINE__, i, 0);
 #endif
 		}
-	}
+*/	}
 	DT.setWaitForConversion(false);
 }

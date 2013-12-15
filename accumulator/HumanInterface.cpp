@@ -98,7 +98,7 @@ void HumanInterface::Print_graph(void)
 	BufferIndex=0;
 	print((int)rTS->tempC[0],DEC);
 	if (rTS->tempC[0] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
-		rLCD->GoTo(48-strlen((const char *)Buffer)*8-4-5, 4);
+		rLCD->GoTo(48-strlen((const char *)Buffer)*8-7, 4);
 	} else {
 		rLCD->GoTo(4, 4);
 	}
@@ -109,7 +109,7 @@ void HumanInterface::Print_graph(void)
 
 	BufferIndex=0;
 	print((int)rTS->tempC[rTS->count-1],DEC);
-	if (rTS->tempC[rTS->count] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
+	if (rTS->tempC[rTS->count-1] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
 		rLCD->GoTo(48-strlen((const char *)Buffer)*8-7, 84-14-4);
 	} else {
 		rLCD->GoTo(4, 84-14-4);
@@ -121,7 +121,7 @@ void HumanInterface::Print_graph(void)
 
 	//print useful Mega calories. Assume accumulator size 1000liters
 	double Mcal=0;
-	double Mcal_full=MAX_TEMP;
+	double Mcal_full=MAX_TEMP-MIN_TEMP;
 	int temp;
 	uint8_t* p;
 	for (i = 0; i < rTS->count-1; i++) {
@@ -136,6 +136,9 @@ void HumanInterface::Print_graph(void)
 	print(Mcal*100/Mcal_full,2);
 	p=Buffer;
 	rLCD->GoTo(10,42-14);
+	if(Mcal>Mcal_full) {
+		rLCD->GoTo(2,42-14);
+	}
 	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
 	while(*p) {
 		rLCD->putChar(*(p++));

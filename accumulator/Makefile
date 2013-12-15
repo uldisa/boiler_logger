@@ -25,3 +25,4 @@ TemperatureSensor.o test_LCD.o HumanInterface.o: TemperatureSensor.h
 HumanInterface.o :HumanInterface.h
 
 test_LCD.elf: test_LCD.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a 
+main.elf: main.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a 
