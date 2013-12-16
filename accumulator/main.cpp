@@ -8,10 +8,14 @@
 #include "HumanInterface.h"
 
 PCD8544 LCD(14, 13, 12, 11, 10);
-TemperatureSensor TS(9);
+TemperatureSensor TS(8);
 HumanInterface GUI(&LCD, &TS);
 #define BUTTON_PIN 15
 #define HARTBEAT_LED 7
+#define LCD_BACKLIGHT 9
+#define BACKLIGHT_MAX 170
+#define BACKLIGHT_TIMEOUT 30000 // 30 seconds
+#define BACKLIGHT_SWITCH_TIME 2000 // 30 seconds
 
 // Variables will change:
 int ledState = HIGH;		// the current state of the output pin
@@ -104,7 +108,9 @@ ISR(TIMER2_OVF_vect)
 
 }
 int main(void) {
-	int x, y;
+	unsigned long backlightDue;
+	unsigned long backlightOn;
+	int backlightValue;
 	cli();
 	SPCR=0;//disable SPI
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
@@ -112,7 +118,12 @@ int main(void) {
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
 	pinMode(HARTBEAT_LED ,OUTPUT);
 	digitalWrite(HARTBEAT_LED ,HIGH);
+	backlightOn=millis()+1;
+	backlightDue=backlightOn+3000;
+	backlightValue=0;
+	pinMode(LCD_BACKLIGHT ,OUTPUT);
 	sei();			//Enable interrupts
+	analogWrite(LCD_BACKLIGHT,0 );
 	init();
 	TS.init();
 	pinMode(BUTTON_PIN, INPUT);
@@ -122,6 +133,26 @@ int main(void) {
 	LCD.Clear();
 	DL_startPeriod();
 	while (1) {
+		if(backlightOn) {
+			if(backlightDue<millis()) {
+				//Dimming backlight
+				backlightValue=BACKLIGHT_MAX-(millis()-backlightDue)*BACKLIGHT_MAX/BACKLIGHT_SWITCH_TIME; 
+				if(backlightValue>=0) {
+					analogWrite(LCD_BACKLIGHT,backlightValue);
+				} else {
+					analogWrite(LCD_BACKLIGHT,0);
+					backlightOn=0;// Special value. Prevent from backlight on counter overflow
+				}
+			} else {
+				backlightValue=(millis()-backlightOn)*BACKLIGHT_MAX/BACKLIGHT_SWITCH_TIME; 
+				if(backlightValue<=BACKLIGHT_MAX) {
+					analogWrite(LCD_BACKLIGHT,backlightValue);
+				} else {
+					analogWrite(LCD_BACKLIGHT,BACKLIGHT_MAX);
+					backlightValue=BACKLIGHT_MAX;
+				}
+			}
+		}
 		int reading = digitalRead(BUTTON_PIN);
 		if (reading != lastButtonState) {
 			// reset the debouncing timer
@@ -137,8 +168,13 @@ int main(void) {
 				buttonState = reading;
 
 				if (buttonState == HIGH) {
-					GUI.next();
-					LCD.Clear();
+					if(!backlightOn || backlightDue<millis() ) {
+						backlightOn=millis();
+						backlightDue=backlightOn+BACKLIGHT_TIMEOUT;
+					} else {
+						GUI.next();
+						LCD.Clear();
+					}
 				}
 			}
 			buttonState = reading;
