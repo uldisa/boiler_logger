@@ -1,11 +1,12 @@
 #include <Arduino.h>
 #include <math.h>
 #include <PCD8544.h>
-#include <HardwareSerial.h>
+//#include <HardwareSerial.h>
 #include <string.h>
 #include "BIGSERIF.h"
 #include "TemperatureSensor.h"
 #include "HumanInterface.h"
+#include <Wire.h>
 
 PCD8544 LCD(14, 13, 12, 11, 10);
 TemperatureSensor TS(8);
@@ -107,6 +108,10 @@ ISR(TIMER2_OVF_vect)
 	digitalWrite(HARTBEAT_LED,!digitalRead(HARTBEAT_LED));
 
 }
+void requestEvent(void) {
+	// Send all data
+	Wire.write((const uint8_t *)TS.tempRaw,sizeof(uint16_t)*TS.count);
+}
 int main(void) {
 	unsigned long backlightDue;
 	unsigned long backlightOn;
@@ -128,7 +133,9 @@ int main(void) {
 	TS.init();
 	pinMode(BUTTON_PIN, INPUT);
 
-	Serial.begin(115200);
+//	Serial.begin(115200);
+	Wire.begin(2);
+	Wire.onRequest(requestEvent);
 	LCD.Contrast(0xB0);
 	LCD.Clear();
 	DL_startPeriod();
