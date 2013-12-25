@@ -21,6 +21,8 @@ TemperatureSensor::TemperatureSensor(uint8_t pin):OW(pin),DT(&OW){
 	DA=::DA;
 	conversionDelay=TEMP_CONVERSION_DELAY;
 	count=TEMP_COUNT;
+	tempMIN=200;
+	tempMAX=-200;
 }
 
 void TemperatureSensor::init(void)
@@ -33,6 +35,7 @@ void TemperatureSensor::init(void)
 	//count=DT.getDeviceCount();
 	for (int i = 0; i < count; i++) {
 		DT.setResolution(DA[i], TEMP_PRECISION );
+//		DT.getTemp(DA[i]);
 		tempRaw[i] = DT.getTemp(DA[i]);
 		tempC[i]=(double)tempRaw[i] * 0.0625;
 /*		// Enable asychronous temperature conversion

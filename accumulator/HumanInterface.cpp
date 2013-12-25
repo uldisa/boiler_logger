@@ -25,41 +25,66 @@ void HumanInterface::next(void){
 		Print_func=&HumanInterface::Print_temp;
 		return;
 	}
-	
 	if(Print_func==&HumanInterface::Print_temp) {
+		Print_func=&HumanInterface::Print_extremes;
+		return;
+	}
+	if(Print_func==&HumanInterface::Print_extremes) {
 		Print_func=&HumanInterface::Print_graph;
 		return;
 	}
 }
+void HumanInterface::print_tempC(double tempC)
+{
+	uint8_t* p;
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	BufferIndex=0;
+	print(tempC,4);
+	p=Buffer;
+	while(*p) {
+		rLCD->putChar(*(p++));
+		if(*p=='.') {
+			p++;
+			break;
+		}
+	}	
+	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	rLCD->GoTo(rLCD->cursorX+2,rLCD->cursorY+5);
+	while(*p) {
+		rLCD->putChar(*(p++));
+	}	
+}
 void HumanInterface::Print_temp(void)
 {
 	uint8_t i;
-	uint8_t* p;
 	for (i = 0; i < rTS->count; i++) {
-		rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
 		rLCD->GoTo(5, 14*i);
-		BufferIndex=0;
-		print(rTS->tempC[i],4);
-		p=Buffer;
-		while(*p) {
-			rLCD->putChar(*(p++));
-			if(*p=='.') {
-				p++;
-				break;
-			}
-		}	
-		rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
-		rLCD->GoTo(rLCD->cursorX+2,rLCD->cursorY+5);
-		while(*p) {
-			rLCD->putChar(*(p++));
-		}	
+		print_tempC(rTS->tempC[i]);
 	}
 	rLCD->DisplayUpdate();
 }
+void HumanInterface::Print_extremes(void)
+{
 
-#define MIN_TEMP 20
-#define MAX_TEMP 85
-void HumanInterface::fillLeft(uint8_t from_x,uint8_t from_y ,int8_t to_x,int8_t to_y)
+	rLCD->setMode(OVERWRITE);
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->Cursor(0,0);
+	rLCD->println("MAX\n      ");
+	rLCD->Cursor(0,1);
+	print_tempC(rTS->tempMAX);
+
+	rLCD->setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
+	rLCD->Cursor(0,3);
+	rLCD->println("MIN\n      ");
+	rLCD->Cursor(0,4);
+	print_tempC(rTS->tempMIN);
+	rLCD->DisplayUpdate();
+}
+
+
+#define MIN_TEMP 30.0
+#define MAX_TEMP 80.0
+void HumanInterface::fillLeft(int16_t from_x,int16_t from_y ,int16_t to_x,int16_t to_y)
 {
 	uint8_t bank;
 	uint8_t y;
@@ -86,14 +111,16 @@ void HumanInterface::fillLeft(uint8_t from_x,uint8_t from_y ,int8_t to_x,int8_t 
 void HumanInterface::Print_graph(void)
 {
 	uint8_t i;
-	int8_t from;
-	int8_t to;
+	double from;
+	double to;
 	rLCD->setMode(OVERWRITE);
+	// Draw temperature graph
 	for (i = 0; i < rTS->count-1; i++) {
-		from = (rTS->tempC[i] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
-		to = (rTS->tempC[i + 1] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
+		from = (double)(rTS->tempC[i] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
+		to = (double)(rTS->tempC[i + 1] - MIN_TEMP) * 48 / (MAX_TEMP - MIN_TEMP);
 		fillLeft(from,i*84/(rTS->count-1) , to, (i+1)*84/(rTS->count-1) );
 	}
+	// print temperature of the top of accumulator 
 	rLCD->setMode(XOR);
 	BufferIndex=0;
 	print((int)rTS->tempC[0],DEC);
@@ -107,9 +134,15 @@ void HumanInterface::Print_graph(void)
 	rLCD->setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
 	rLCD->print('c');
 
+	//Print temperature of the bottom of accumulator
 	BufferIndex=0;
 	print((int)rTS->tempC[rTS->count-1],DEC);
-	if (rTS->tempC[rTS->count-1] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
+	// Get accumulator temperature near the bottom to decide where to print temperature
+	i=rTS->count-1; // index of last (bottom) thermometer;
+	if(i>0) { // Normaly there are more than one thermometer and bottom temperatur is printed in the best free space.
+		i--;
+	}
+	if (rTS->tempC[i] < (MAX_TEMP-MIN_TEMP)/2+MIN_TEMP) {
 		rLCD->GoTo(48-strlen((const char *)Buffer)*8-7, 84-14-4);
 	} else {
 		rLCD->GoTo(4, 84-14-4);
@@ -122,7 +155,7 @@ void HumanInterface::Print_graph(void)
 	//print useful Mega calories. Assume accumulator size 1000liters
 	double Mcal=0;
 	double Mcal_full=MAX_TEMP-MIN_TEMP;
-	int temp;
+	double temp;
 	uint8_t* p;
 	for (i = 0; i < rTS->count-1; i++) {
 		temp=(rTS->tempC[i]+rTS->tempC[i + 1])/2-MIN_TEMP;
@@ -133,7 +166,7 @@ void HumanInterface::Print_graph(void)
 	}	
 
 	BufferIndex=0;
-	print(Mcal*100/Mcal_full,2);
+	print((double)Mcal*100.0/Mcal_full,2);
 	p=Buffer;
 	rLCD->GoTo(10,42-14);
 	if(Mcal>Mcal_full) {

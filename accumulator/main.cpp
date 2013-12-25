@@ -15,7 +15,7 @@ HumanInterface GUI(&LCD, &TS);
 #define HARTBEAT_LED 7
 #define LCD_BACKLIGHT 9
 #define BACKLIGHT_MAX 170
-#define BACKLIGHT_TIMEOUT 30000 // 30 seconds
+#define BACKLIGHT_TIMEOUT 90000 // 90 seconds
 #define BACKLIGHT_SWITCH_TIME 2000 // 30 seconds
 
 // Variables will change:
