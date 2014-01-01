@@ -129,13 +129,13 @@ function getSensors() {
 		var values=data.toString().split("\t");
 		var temp_id;
 		document.getElementById("date").innerHTML=values[0];
-		for (var i=1; i<values.length; i++) {
+		for (var i=1; i<values.length && i<7; i++) {
 			temp_id="temp_"+i
 			document.getElementById(temp_id).innerHTML=values[i];
 		}
-		for (var i=7; i<values.length; i++) {
+		for (var i=1; i<values.length-6; i++) {
 			temp_id="acc_"+i
-			document.getElementById(temp_id).innerHTML=values[i];
+			document.getElementById(temp_id).innerHTML=values[i+6];
 		}
 	},'text');
 }
