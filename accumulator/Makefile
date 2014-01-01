@@ -40,7 +40,6 @@ $(CURDIR)/Wire/:
 
 
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
-accumulator.elf: accumulator.o PCD8544.o libMemoryFree.a libDallasTemperature.a libOneWire.a libcore.a
 PCD8544.o test_LCD.o: PCD8544.h
 main.o TemperatureSensor.o test_LCD.o HumanInterface.o: TemperatureSensor.h
 main.o HumanInterface.o :HumanInterface.h

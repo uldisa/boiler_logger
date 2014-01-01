@@ -44,7 +44,6 @@ class PCD8544:public Print
   void setFont(prog_char *font,int8_t width,int8_t height,bool direction); 
   void setMode(write_mode m); 
   void putChar(uint8_t c);
-  void printFloatString(const char TextString[]);
 
   size_t write(uint8_t);
   size_t write(const uint8_t *buffer, size_t size);
