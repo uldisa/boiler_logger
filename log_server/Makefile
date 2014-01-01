@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core MemoryFree SD_ada SPI Ethernet DallasTemperature OneWire
+LIBS=core MemoryFree SD SPI Ethernet DallasTemperature OneWire
 #PORT=/dev/ttyACM0
 PORT=COM11
 CPU=atmega2560
@@ -39,4 +39,4 @@ $(CURDIR)/Wire/:
 
 
 CPPFLAGS+=-Wall -Wextra -I. -Os -fno-exceptions -ffunction-sections -fdata-sections
-main.elf: main.o twi.o TemperatureSensor.o DS1302.o LogRecord.o libMemoryFree.a libSD_ada.a libEthernet.a libSPI.a libcore.a libDallasTemperature.a libOneWire.a 
+main.elf: main.o twi.o TemperatureSensor.o DS1302.o LogRecord.o libMemoryFree.a libSD.a libEthernet.a libSPI.a libcore.a libDallasTemperature.a libOneWire.a 
