@@ -21,8 +21,8 @@ $(foreach l,$(filter-out core,$(LIBS)),$(if $(wildcard $(ARD_LIB_PATH)/$l $(USER
 endif
 
 define get_lib_sources
-LIB$1_C     += $(foreach d,. src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.c))
-LIB$1_CPP   += $(foreach d,. src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.cpp))
+LIB$1_C     += $(foreach d,. utility src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.c))
+LIB$1_CPP   += $(foreach d,. utility src src/utility arch/avr arch/avr/utility,$(wildcard $2/$(d)/*.cpp))
 endef
 $(foreach l,$(filter-out core,$(LIBS)),$(eval $(call get_lib_sources,$(l),$(ARD_LIB_PATH)/$(l))))
 $(foreach l,$(filter-out core,$(LIBS)),$(eval $(call get_lib_sources,$(l),$(USER_LIB_PATH)/$(l))))
