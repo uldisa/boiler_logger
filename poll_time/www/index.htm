@@ -60,9 +60,14 @@
 #temp_5
 {
     left:80px;
-    top:130px;
+    top:154px;
 }
 #temp_6
+{
+    left:80px;
+    top:130px;
+}
+#temp_7
 {
     left:80px;
     top:30px;
@@ -106,8 +111,9 @@
 <p class="temp" id="temp_2">boilin_</p>
 <p class="temp" id="temp_3">heatto_</p>
 <p class="temp" id="temp_4">heatfr_</p>
-<p class="temp" id="temp_5">inside_</p>
-<p class="temp" id="temp_6">outside</p>
+<p class="temp" id="temp_5">inside2</p>
+<p class="temp" id="temp_6">inside3</p>
+<p class="temp" id="temp_7">outside</p>
 <p class="acc" id="acc_1">acc1___</p>
 <p class="acc" id="acc_2">acc2___</p>
 <p class="acc" id="acc_3">acc3___</p>
@@ -128,13 +134,13 @@ function getSensors() {
 		var values=data.toString().split("\t");
 		var temp_id;
 		document.getElementById("date").innerHTML=values[0];
-		for (var i=1; i<values.length && i<7; i++) {
+		for (var i=1; i<values.length && i<=7; i++) {
 			temp_id="temp_"+i
 			document.getElementById(temp_id).innerHTML=values[i];
 		}
-		for (var i=1; i<values.length-6; i++) {
+		for (var i=1; i<values.length-7; i++) {
 			temp_id="acc_"+i
-			document.getElementById(temp_id).innerHTML=values[i+6];
+			document.getElementById(temp_id).innerHTML=values[i+7];
 		}
 	},'text');
 }
