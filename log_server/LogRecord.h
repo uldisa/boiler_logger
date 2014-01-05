@@ -3,6 +3,7 @@
 #include <Print.h>
 #include "TemperatureSensor.h"
 #include "DS1302.h"
+#define PUMP_PIN 2
 class LogRecord:public Print {
  public:
 	char* Buffer;

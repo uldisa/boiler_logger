@@ -28,6 +28,8 @@ extern "C" {
 #define ETHERNET_CS 10
 #define SD_CS 4
 #define HARTBEAT_LED 7
+// define in LogRecord
+//#define PUMP_PIN 2
 
 #ifdef SDCARD
 Sd2Card card;
@@ -464,6 +466,7 @@ void setup(void)
 	TCCR2A = 0b00000000;	//Normal Timer2 mode.
 	TCCR2B = 0b00000111;	//Prescale 16Mhz/1024
 	TIMSK2 = 0b00000001;	//Enable overflow interrupt
+	pinMode(PUMP_PIN ,INPUT);
 	pinMode(HARTBEAT_LED ,OUTPUT);
 	digitalWrite(HARTBEAT_LED ,HIGH);
 	pinMode(53, OUTPUT);	

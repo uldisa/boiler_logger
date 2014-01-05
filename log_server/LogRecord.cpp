@@ -48,6 +48,8 @@ char* LogRecord::fill(void) {
 		print('\t');
 		print((float)remoteTempRaw[i] * 0.0625, 4);
 	}
+	print('\t');
+	print(digitalRead(PUMP_PIN),DEC);
 
 	return Buffer;
 }
