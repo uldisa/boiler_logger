@@ -456,6 +456,11 @@ void getRequest(EthernetServer * server)
 		goto end;
  end:
 		client.stop();
+		i=10;
+		while(client.status() !=0 && i) {
+			i--;
+			delay(5);
+		}
 	}
 	return;
 }
