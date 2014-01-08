@@ -40,7 +40,7 @@ int SD_file_date = 0;
 #endif
 #define remoteTempCount 6
 int16_t remoteTempRaw[remoteTempCount]={DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW,DEVICE_DISCONNECTED_RAW};
-TemperatureSensor TS(A0);
+TemperatureSensor TS;
 Time DL_time;
 DS1302 rtc(A3 /*reset */ , A2 /*IO*/, A1 /*SCLK*/);
 LogRecord LR(&TS,remoteTempRaw,&DL_time);
