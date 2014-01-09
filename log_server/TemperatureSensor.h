@@ -3,24 +3,22 @@
 
 #define REQUIRESALARMS false
 #include <DallasTemperature.h>
+#define TEMP_NET1_PIN A0
+#define TEMP_NET2_PIN A4
 
 class TemperatureSensor {
 public:
 	int16_t* tempRaw;
-	DeviceAddress* DA;
+//	DeviceAddress* DA;
 	int conversionDelay;
 	int count;
 	OneWire OW;
+	OneWire OW2;
 	DallasTemperature DT;
+	DallasTemperature DT2;
 	void init(void);
-	TemperatureSensor(uint8_t pin);
-	void requestTemperatures(void) {
-		DT.requestTemperatures();
-	}
-	void getTemperatures(void) {
-		for (int i = 0; i < count; i++) {
-			tempRaw[i] = DT.getTemp(DA[i]);
-		}
-	}
+	TemperatureSensor(void);
+	void requestTemperatures(void);
+	void getTemperatures(void);
 };
 #endif
