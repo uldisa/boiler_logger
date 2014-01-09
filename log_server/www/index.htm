@@ -1,16 +1,12 @@
-<html>
+<META HTTP-EQUIV="Pragma" charset="ASCII">
 <style>
 #container
 {
+    left:0px;
+    top:0px;
  height:600px;
  width:600px;
- position:relative;
-}
-#image
-{    
-    position:absolute;
-    left:0;
-    top:0;
+ position:absolute;
 }
 .temp
 {
@@ -102,10 +98,32 @@
     left:345px;
     top:450px;
 }
+#house
+{
+    position: absolute;
+    left:10px;
+    top:50px;
+}
+#fire
+{    
+    position:absolute;
+    left:80;
+    top:410;
+    visibility:hidden;
+}
+#wood
+{    
+    position:absolute;
+    left:80;
+    top:470;
+}
 </style>
+<html>
 <body>
 <div id="container">
-<img id="image" src="boiler.gif" >
+<img id="house" src="house.gif" >
+<img id="wood" src="wood.gif" >
+<img id="fire" src="fire.gif" >
 <p id="date">This is sample date</p>
 <p class="temp" id="temp_1">boilout</p>
 <p class="temp" id="temp_2">boilin_</p>
@@ -121,34 +139,39 @@
 <p class="acc" id="acc_5">acc5___</p>
 <p class="acc" id="acc_6">acc6___</p>
 </div>
-
-
 <!--script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"-->
 <script src="jquery.js">
 </script>
-
 <script>
 //$(document).ready(function(){
 function getSensors() {
-	$.get("/sensors",function(data,status){
+	$.get("sensors",function(data,status){
+//		var parser=new DOMParser();
+//		var t=parser.parseFromString(data, "text/xml");
+//		var values=t.getElementsByTagName( "code" )[0].childNodes[0].nodeValue.split("\t");
 		var values=data.toString().split("\t");
-		var temp_id;
 		document.getElementById("date").innerHTML=values[0];
-		for (var i=1; i<values.length && i<=7; i++) {
+		var temp_id;
+		for (var i=1; i<=7; i++) {
 			temp_id="temp_"+i
-			document.getElementById(temp_id).innerHTML=values[i];
+			document.getElementById(temp_id).innerHTML=Number(values[i]).toFixed(1);
 		}
-		for (var i=1; i<values.length-7; i++) {
+		for (var i=1; i<=6; i++) {
 			temp_id="acc_"+i
-			document.getElementById(temp_id).innerHTML=values[i+7];
+			document.getElementById(temp_id).innerHTML=Number(values[i+7]).toFixed(1);
+		}
+		var fire_on=values[14];
+		if(fire_on==1){
+			document.getElementById("fire").style.visibility="visible";
+			document.getElementById("wood").style.visibility="hidden";
+		} else {
+			document.getElementById("fire").style.visibility="hidden";
+			document.getElementById("wood").style.visibility="visible";
 		}
 	},'text');
 }
 getSensors();
 setInterval(function(){getSensors();}
 ,1000);
-//});
 </script>
-
-
 </body></html>
