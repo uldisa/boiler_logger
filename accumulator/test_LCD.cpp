@@ -7,8 +7,8 @@
 #include "TemperatureSensor.h"
 #include "HumanInterface.h"
 
-PCD8544 LCD(14, 13, 12, 11, 10);
-TemperatureSensor TS(9);
+PCD8544 LCD;
+TemperatureSensor TS(7);
 HumanInterface GUI(&LCD, &TS);
 const int buttonPin = 15;
 
@@ -30,7 +30,7 @@ int main(void) {
 	pinMode(buttonPin, INPUT);
 
 	Serial.begin(115200);
-	LCD.Contrast(0xB0);
+	LCD.begin();
 	LCD.Clear();
 //      LCD.setFont(&BIGSERIF[0][0],8,14,F_UP_DOWN);
 	LCD.print("1234567890\nClear");
@@ -41,15 +41,15 @@ int main(void) {
 	LCD.DisplayFlush();
 	delay(500);
 
-	memset(PCD8544_RAM, 0xAA, 84 * 6);
+	memset(PCD8544_FB, 0xAA, 84 * 6);
 	LCD.DisplayFlush();
 //      LCD.GoTo(4,4);
 //      LCD.print("Test 2\nUpdate\nRAM");
 	LCD.DisplayFlush();
 	for (x = 2; x < 4; x++) {
 		for (y = 60; y < 80; y++) {
-			PCD8544_RAM[5 - x][y] |= 0x55;
-			PCD8544_CHANGED_RAM[y] |= 0x80 >> x;
+			PCD8544_FB[5 - x][y] |= 0x55;
+			PCD8544_FB_DIRTY[y] |= 0x80 >> x;
 		}
 	}
 	LCD.DisplayUpdate();

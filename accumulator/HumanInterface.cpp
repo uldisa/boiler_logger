@@ -2,23 +2,19 @@
 #include "BIGSERIF.h"
 #include "font5x8.h"
 #define PRINT_BUFFER_SIZE 10
-#define REFRESH_INTERVAL 500
 static uint8_t printBuffer[PRINT_BUFFER_SIZE];
 HumanInterface::HumanInterface(PCD8544 * LCD, TemperatureSensor * TS):rTS(TS)
 	,rLCD(LCD)
 	,Buffer(printBuffer)
 	,BufferIndex(0)
-	,nextRefresh(0)
 	,Print_func(&HumanInterface::Print_graph)
 
 {
 	Print_func=&HumanInterface::Print_graph;
 } 
 void HumanInterface::Refresh(void) {
-	if(millis()>nextRefresh){
-		nextRefresh=millis()+REFRESH_INTERVAL;
-		(*this.*Print_func)();
-	}
+	(*this.*Print_func)();
+	rLCD->Render();
 }
 void HumanInterface::next(void){
 	if(Print_func==&HumanInterface::Print_graph) {
@@ -61,7 +57,6 @@ void HumanInterface::Print_temp(void)
 		rLCD->GoTo(5, 14*i);
 		print_tempC(rTS->tempC[i]);
 	}
-	rLCD->DisplayUpdate();
 }
 void HumanInterface::Print_extremes(void)
 {
@@ -78,7 +73,6 @@ void HumanInterface::Print_extremes(void)
 	rLCD->println("MIN\n      ");
 	rLCD->Cursor(0,4);
 	print_tempC(rTS->tempMIN);
-	rLCD->DisplayUpdate();
 }
 
 
@@ -100,10 +94,9 @@ void HumanInterface::fillLeft(int16_t from_x,int16_t from_y ,int16_t to_x,int16_
 			if(length<8) {
 				newval <<= (8-length);
 			}
-			val=PCD8544_RAM[5-bank][y];
+			val=PCD8544_FB[5-bank][y];
 			if(val != newval) {
-				PCD8544_RAM[5-bank][y]=newval;
-				PCD8544_CHANGED_RAM[y]|=0x80>>bank;
+				PCD8544_FB[5-bank][y]=newval;
 			}
 		}
 	}
@@ -203,7 +196,6 @@ void HumanInterface::Print_graph(void)
 
 
 	rLCD->setMode(OVERWRITE);
-	rLCD->DisplayUpdate();
 }
 size_t HumanInterface::write(uint8_t c){
 	if(BufferIndex>=PRINT_BUFFER_SIZE){

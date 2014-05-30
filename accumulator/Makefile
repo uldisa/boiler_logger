@@ -1,6 +1,6 @@
 include ../Makefile
 
-LIBS=core MemoryFree DallasTemperature OneWire
+LIBS=core MemoryFree DallasTemperature OneWire SPI
 #PORT=/dev/ttyACM0
 #PORT=COM11
 #CPU=atmega2560
@@ -44,5 +44,8 @@ PCD8544.o test_LCD.o: PCD8544.h
 main.o TemperatureSensor.o test_LCD.o HumanInterface.o: TemperatureSensor.h
 main.o HumanInterface.o :HumanInterface.h
 
-test_LCD.elf: test_LCD.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a 
-main.elf: main.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a libWire.a
+test_LCD.elf: test_LCD.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a libSPI.a
+main.elf: main.o TemperatureSensor.o PCD8544.o BIGSERIF.o font5x8.o  HumanInterface.o libcore.a libDallasTemperature.a libOneWire.a libWire.a libSPI.a
+
+test_scheduler.o scheduler.o: scheduler.h
+test_scheduler.elf: test_scheduler.o scheduler.o libcore.a

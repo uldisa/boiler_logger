@@ -9,7 +9,6 @@ class HumanInterface:public Print {
 	PCD8544 *rLCD;
 	uint8_t *Buffer;
 	size_t BufferIndex;
-	unsigned long nextRefresh;
 	HumanInterface(PCD8544 * LCD, TemperatureSensor * TS);
 	void (HumanInterface::*Print_func)(void);
 	void next(void);

@@ -4,16 +4,19 @@
 //#include <HardwareSerial.h>
 #include <string.h>
 #include "BIGSERIF.h"
+#include "font5x8.h"
 #include "TemperatureSensor.h"
 #include "HumanInterface.h"
 #include <Wire.h>
 
-PCD8544 LCD(14, 13, 12, 11, 10);
-TemperatureSensor TS(8);
+// SPI portb for LCD control.
+// PINS 8,9,10,11,12,13
+PCD8544 LCD(9,10,8);
+TemperatureSensor TS(5);
 HumanInterface GUI(&LCD, &TS);
 #define BUTTON_PIN 15
 #define HARTBEAT_LED 7
-#define LCD_BACKLIGHT 9
+#define LCD_BACKLIGHT 6
 #define BACKLIGHT_MAX 170
 #define BACKLIGHT_TIMEOUT 90000 // 90 seconds
 #define BACKLIGHT_SWITCH_TIME 2000 // 30 seconds
@@ -130,17 +133,20 @@ int main(void) {
 	sei();			//Enable interrupts
 	analogWrite(LCD_BACKLIGHT,0 );
 	init();
+	LCD.begin();
 	TS.init();
 	pinMode(BUTTON_PIN, INPUT);
 
 //	Serial.begin(115200);
 	Wire.begin(2);
 	Wire.onRequest(requestEvent);
-	LCD.Contrast(0xB0);
 	LCD.Clear();
-	DL_startPeriod();
-	while (1) {
-		if(backlightOn) {
+//	DL_startPeriod();
+	//while (1) {
+	int x=1000;
+	long start=millis();
+	while (x) {
+/*		if(backlightOn) {
 			if(backlightDue<millis()) {
 				//Dimming backlight
 				backlightValue=BACKLIGHT_MAX-(millis()-backlightDue)*BACKLIGHT_MAX/BACKLIGHT_SWITCH_TIME; 
@@ -160,7 +166,8 @@ int main(void) {
 				}
 			}
 		}
-		int reading = digitalRead(BUTTON_PIN);
+*/
+/*		int reading = digitalRead(BUTTON_PIN);
 		if (reading != lastButtonState) {
 			// reset the debouncing timer
 			lastDebounceTime = millis();
@@ -186,9 +193,19 @@ int main(void) {
 			}
 			buttonState = reading;
 		}
+*/
+		GUI.next();
+		LCD.Clear();
 
 		GUI.Refresh();
-		lastButtonState = reading;
+//		lastButtonState = reading;
+		x--;
 	}
 
+	LCD.Clear();
+	LCD.setFont(&font5x8[0][0],5,8,F_LEFT_RIGHT);
+	LCD.GoTo(0,0);
+	LCD.print("TPS ");
+	LCD.print((float)1000000.0/(millis()-start),4);
+	LCD.Render();
 }

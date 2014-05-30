@@ -1,6 +1,6 @@
 #ifndef PCD8544_h
 #define PCD8544_h
-
+#define USE_FB_DIRTY 1
 #include <Print.h>
 //#include "Arduino.h"
 /* LCD screen dimension. Y dimension is in blocks of 8 bits */
@@ -18,8 +18,7 @@
 #define EXTENDED_COMMAND 0x21
 #define F_UP_DOWN 0 
 #define F_LEFT_RIGHT 1
-extern uint8_t PCD8544_RAM[6][84];
-extern uint8_t PCD8544_CHANGED_RAM[84]; //Bitmask for changed RAM
+extern uint8_t PCD8544_FB[6][84];
 enum write_mode { OVERWRITE, XOR };
 class PCD8544:public Print
 {
@@ -31,16 +30,13 @@ class PCD8544:public Print
   bool	font_direction; 
   write_mode mode;
   prog_char *font;
-  PCD8544(byte RST, byte CE, byte DC, byte Din, byte Clk);
-  void Contrast(byte Level);
-  void WriteData(byte Data);
-  void WriteCommand(byte Command);
+  PCD8544(int RST,int CE,int DC);
+  void begin(void);
 
   void Clear(void); //clears display
   void GoTo(byte XPos, byte YPos);
   void Cursor(byte XPos, byte YPos);
-  void DisplayFlush(); // Sends whole RAM to display
-  void DisplayUpdate(); // Plate only changed bytes
+  void Render(); // Sends whole RAM to display
   void setFont(prog_char *font,int8_t width,int8_t height,bool direction); 
   void setMode(write_mode m); 
   void putChar(uint8_t c);
@@ -51,12 +47,12 @@ class PCD8544:public Print
  
   
   private:
-  byte _RST;
-  byte _CE;
-  byte _DC;
-  byte _Din;
-  byte _Clk;
-  void DisplayMode(byte Mode);
+  	uint8_t PIN_RESET;
+  	uint8_t PIN_CE;
+  	uint8_t PIN_DC;
+	uint8_t PINS_CE_DC;
+	void writeLcd(uint8_t dataOrCommand, uint8_t data);
+	void writeLcd(uint8_t dataOrCommand, const uint8_t *data, uint16_t count);
   
 };
 

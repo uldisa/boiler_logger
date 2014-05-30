@@ -23,7 +23,7 @@ public:
 	void getTemperatures(void) {
 		for (int i = 0; i < count; i++) {
 			tempRaw[i] = DT.getTemp(DA[i]);
-			tempC[i]=(float)tempRaw[i] * 0.0625;
+			//tempC[i]=(float)tempRaw[i] * 0.0625;
 			
 			if(tempC[i]!=DEVICE_DISCONNECTED_C && tempC[i]!=85) {
 				// 85.0 is very unlikely

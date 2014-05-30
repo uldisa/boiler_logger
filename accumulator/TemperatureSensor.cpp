@@ -45,7 +45,7 @@ void TemperatureSensor::init(void)
 		DT.setResolution(DA[i], TEMP_PRECISION );
 //		DT.getTemp(DA[i]);
 		tempRaw[i] = DT.getTemp(DA[i]);
-		tempC[i]=(double)tempRaw[i] * 0.0625;
+//		tempC[i]=(double)tempRaw[i] * 0.0625;
 /*		// Enable asychronous temperature conversion
 		if (DT.getAddress(DA[i], i)) {
 #ifdef DEBUG
